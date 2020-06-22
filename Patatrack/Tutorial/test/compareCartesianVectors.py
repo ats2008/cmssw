@@ -27,7 +27,7 @@ process.convertToCartesianVectors = cms.EDProducer('ConvertToCartesianVectors',
 process.compareCartesianVectors = cms.EDAnalyzer('CompareCartesianVectors',
   first = cms.InputTag('convertToCartesianVectorsCUDA'),
   second = cms.InputTag('convertToCartesianVectors'),
-  precision = cms.double(1.e-7)
+  precision = cms.double(1.e-5)
 )
 
 process.path = cms.Path(process.convertToCartesianVectorsCUDA + process.convertToCartesianVectors + process.compareCartesianVectors)
