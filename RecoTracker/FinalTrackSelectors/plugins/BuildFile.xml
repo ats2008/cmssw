@@ -21,6 +21,7 @@
 <use name="TrackingTools/Records"/>
 <use name="MagneticField/Engine"/>
 <use name="MagneticField/Records"/>
+<use name="RecoTracker/TkTrackingRegions"/>
 <use name="TrackingTools/PatternTools"/>
 <use name="RecoLocalTracker/SiStripClusterizer"/>
 <use name="TrackingTools/TransientTrack"/>
