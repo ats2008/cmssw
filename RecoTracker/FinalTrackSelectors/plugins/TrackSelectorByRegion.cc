@@ -152,7 +152,7 @@ namespace {
            }
 
           size_t it = 0;
-          bool flag=true;
+          bool flag=false;
           for (auto const& trk : tracks) {
             const auto pt = trk.pt();
             const auto eta = trk.eta();
