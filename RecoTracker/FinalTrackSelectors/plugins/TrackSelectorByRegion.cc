@@ -26,6 +26,8 @@ namespace {
       inputTrkRegionToken_ = consumes<edm::OwnVector<TrackingRegion>>(regionPSet.getParameter<edm::InputTag>("input"));
       etaTolerance_ = regionPSet.getParameter<double>("etaTolerance");
       phiTolerance_ = regionPSet.getParameter<double>("phiTolerance");
+      dXYTolerance_ = regionPSet.getParameter<double>("dXYTolerance");
+      dZTolerance_ = regionPSet.getParameter<double>("dZTolerance");
       edm::ParameterSet trackPSet = conf.getParameter<edm::ParameterSet>("TrackPSet");
       minPt_ = trackPSet.getParameter<double>("minPt");
       //      }
@@ -46,8 +48,10 @@ namespace {
 
       edm::ParameterSetDescription region_par;
       region_par.add<edm::InputTag>("input", edm::InputTag(""));
-      region_par.add<double>("phiTolerance", 1.1);
-      region_par.add<double>("etaTolerance", 1.1);
+      region_par.add<double>("phiTolerance", 1.0);
+      region_par.add<double>("etaTolerance", 1.0);
+      region_par.add<double>("dXYTolerance", 1.0);
+      region_par.add<double>("dZTolerance", 1.0);
       desc.add<edm::ParameterSetDescription>("RegionPSet", region_par);
       descriptions.add("trackSelectorByRegion", desc);
     }
@@ -61,7 +65,7 @@ namespace {
       auto output_tracks = std::make_unique<reco::TrackCollection>();  // selected output collection
       auto delta_eta_trk = std::make_unique<std::vector<float>>();
       auto delta_phi_trk = std::make_unique<std::vector<float>>();
-     
+      size_t n_regions ;
      // edm::Handle<edm::OwnVector<TrackingRegion>> regionsHandle;
      // iEvent.getByToken(inputTrkRegionToken_, regionsHandle);
       auto regionsHandle = iEvent.getHandle(inputTrkRegionToken_); 
@@ -74,15 +78,19 @@ namespace {
       if (tracksHandle.isValid()) {
         const auto tracks = *tracksHandle;
         mask->assign(tracks.size(), false);
-
-        if (regionsHandle.isValid()) {
+       if (regionsHandle.isValid()) {
           const auto& regions = *regionsHandle;
 
-          const auto n_regions = regions.size();
+          n_regions= regions.size();
+        delta_eta_trk->assign(tracks.size()*n_regions, 1e9);
+        delta_phi_trk->assign(tracks.size()*n_regions, 1e9);
+ 
           std::vector<float> etaMin;
           etaMin.reserve(n_regions);
+          
           std::vector<float> etaMax;
           etaMax.reserve(n_regions);
+         
           std::vector<float> phi0;
           phi0.reserve(n_regions);
      
@@ -91,15 +99,19 @@ namespace {
           
           std::vector<float> phiMin;
           phiMin.reserve(n_regions);
+          
           std::vector<float> phiMax;
           phiMax.reserve(n_regions);
 
           std::vector<math::XYZPoint> origin;
           origin.reserve(n_regions);
+          
           std::vector<float> zBound;
           zBound.reserve(n_regions);
+          
           std::vector<float> RBound;
           RBound.reserve(n_regions);
+          
           std::vector<float> pTmin ;
           pTmin.reserve(n_regions);
 
@@ -107,8 +119,8 @@ namespace {
             if (const auto* etaPhiRegion = dynamic_cast<const RectangularEtaPhiTrackingRegion*>(&tmp)) {
              
               pTmin.push_back(etaPhiRegion->ptMin());
-              if(std::abs(float(etaPhiRegion->ptMin())-2.0)>0.1) 
-                    std::cout<<"pTmin from region != 2 but is "<<etaPhiRegion->ptMin()<<std::endl;
+           //   if(std::abs(float(etaPhiRegion->ptMin())-2.0)>0.1) 
+               std::cout<<"pTmin from region  = "<<etaPhiRegion->ptMin()<<std::endl;
               //pTmin.push_back(0.0);
               const auto& etaRange = etaPhiRegion->etaRange();
               const auto& phiMargin = etaPhiRegion->phiMargin();
@@ -117,81 +129,85 @@ namespace {
               
               etaMin.push_back(0.5*((1+etaTolerance_)*etamin+(1-etaTolerance_)*etamax));
               etaMax.push_back(0.5*((1-etaTolerance_)*etamin+(1+etaTolerance_)*etamax));
-
+            if(0.9<(etamax-etamin))
+            {
+              std::cout<<"eta : "<<0.5*((1+etaTolerance_)*etamin+(1-etaTolerance_)*etamax)<<", ";
+              std::cout<<0.5*((1-etaTolerance_)*etamin+(1+etaTolerance_)*etamax)<<" <-  ";
+              std::cout<<" "<<etamin<<" , "<<etamax<<"\n";
+            } 
               phi0.push_back(etaPhiRegion->phiDirection());
               phi0margin.push_back(phiMargin.right()*phiTolerance_);   // Is it perfectly okay ? is there need for left and right ?
 	        
 	      float phiTemp=etaPhiRegion->phiDirection()-phiMargin.left()*phiTolerance_;
-	      if (phiTemp<-M_PI) 
-          {
-              std::cout<<"phiMin -pi crossover : "<<phiTemp<<" -> ";
-              phiTemp+=2*M_PI;
-              std::cout<<" "<<phiTemp<<std::endl; 
-          }
-	      phiMin.push_back(phiTemp);
+	      phiMin.push_back(reco::reduceRange(phiTemp));
 	      
 	      phiTemp=etaPhiRegion->phiDirection()+phiMargin.right()*phiTolerance_;
-	      if (phiTemp>M_PI)
-          {
-              std::cout<<"phiMax +pi crossover : "<<phiTemp<<" -> ";
-              phiTemp-=2*M_PI;
-              std::cout<<" "<<phiTemp<<std::endl; 
-          
-          }
-	      phiMax.push_back(phiTemp);
-              
+	      phiMax.push_back(reco::reduceRange(phiTemp));
+          std::cout<<phiMargin.left()<<" ,  "<<phiMargin.right()<<std::endl;
+
 	      GlobalPoint gp = etaPhiRegion->origin();
               origin.push_back(math::XYZPoint(gp.x(), gp.y(), gp.z()));
-              zBound.push_back(etaPhiRegion->originZBound());
-            RBound.push_back(etaPhiRegion->originRBound());
+              zBound.push_back(etaPhiRegion->originZBound()*dZTolerance_);
+            RBound.push_back(etaPhiRegion->originRBound()*dXYTolerance_);
             
            }
+            else
+            {
+                std::cout<<"Bad region input !!"<<"\n";
+                 edm::LogWarning <<"Region not supported !!"<<"\n";
+            }
+
 
           size_t it = 0;
     //      if( tracks.size()>0)
     //        std::cout << "tracks: " << tracks.size() << std::endl;
+          bool flag=false;
           for (auto const& trk : tracks) {
             const auto pt = trk.pt();
-            
-
             const auto eta = trk.eta();
             const auto phi = trk.phi();
+
+//            if ( pt<26 && pt>23) flag = true;
+//            else flag =false;
+            
+            if(flag) std::cout<<" pT = "<<pt<<std::endl;
             for (size_t k = 0; k < n_regions; k++) {
             
            //          CALIBERATION CODE
-            delta_eta_trk->push_back((eta-0.5*(etaMax[k]+etaMin[k])));
-            delta_phi_trk->push_back(reco::deltaPhi(phi, phi0[k]));
- 
-             //   		if ( std::abs(trk.vz() - origin[k].z()) > zBound[k] ) {
+            delta_eta_trk->at(it*n_regions+k)=(eta-0.5*(etaMax[k]+etaMin[k]));
+            delta_phi_trk->at(it*n_regions+k)=(reco::deltaPhi(phi, phi0[k]));
+            if (pt < pTmin[k] ) {
+              if(flag)	std::cout << " KO !!! for pt "<<pt<<" [<"<<pTmin[k]<<"]  k = "<<k<<"/"<<n_regions<< std::endl;
+              continue;
+            }
+  //   		if ( std::abs(trk.vz() - origin[k].z()) > zBound[k] ) {
 //            { 		std::cout <<" k ="<<k<<"/"<<n_regions<<" std::abs(trk.vz() - origin[k].z()): " << std::abs(trk.vz() - origin[k].z()) << " zBound: " << zBound[k] << std::endl;
 //              		std::cout << "std::abs(trk.dz(origin[k])): " << std::abs(trk.dz(origin[k])) << " zBound: " << zBound[k] << std::endl;
 //              		std::cout << "std::abs(trk.dxy(origin[k])): " << std::abs(trk.dxy(origin[k])) << " RBound: " << RBound[k] << std::endl;
 //              		std::cout << " trk   :  " <<trk.vx() <<","<<trk.vy()<<","<<trk.vz()<< std::endl;
 //              		std::cout << "origin :  " <<origin[k].x() <<","<<origin[k].y()<<","<<origin[k].z()<< std::endl;
 //		}
-              if (std::abs(trk.dz(origin[k])) > zBound[k]) {
-        //        		  std::cout << " KO !! for z" << std::endl;
+              if (std::abs(trk.dz(origin[k])) > zBound[k] ) {
+               if(flag)  std::cout << " KO !! for z !! "<<"  pT = "<<pt<<" k = "<<k<<"/"<<n_regions
+                                    <<" std::abs(trk.dz(origin[k])) > zBound[k] -> "
+                                    <<std::abs(trk.dz(origin[k]))<<" > "<<zBound[k]<< std::endl;
                 continue;
               }
            if (std::abs(trk.dxy(origin[k])) > RBound[k]) {
-//                		  std::cout << " KO !! for dXY" << std::endl;
-//                          std::cout << "std::abs(trk.dxy(origin[k])): " << std::abs(trk.dxy(origin[k])) << " RBound: " << RBound[k] << std::endl;
-                          continue;
-              }
-
-            if (pt < pTmin[k]) {
-//              		std::cout << " KO !!! for pt"<<pt<<" [<"<<pTmin[k]<<"]"<< std::endl;
- //             continue;
-            }
-
-      if (eta < etaMin[k]) {
-          //    		      std::cout<<"k="<<k<<"/"<<n_regions<<" eta : " << eta << " etaMin[k]: " << etaMin[k] << " etaMax[k]: " << etaMax[k];
-          //      	      std::cout << " KO !!! for eta" << std::endl;
+                if(flag)  std::cout << " KO !! for dXY"
+                          <<"  pT = "<<pt<<" k = "<<k<<"/"<<n_regions<<" std::abs(trk.dxy(origin[k])): " << std::abs(trk.dxy(origin[k])) << " RBound: " << RBound[k] << std::endl;
                 continue;
               }
-              if (eta > etaMax[k]) {
-      		//          std::cout<<"k="<<k<<"/"<<n_regions<< " eta : " << eta << " etaMin[k]: " << etaMin[k] << " etaMax[k]: " << etaMax[k] ;
-            //   		  std::cout << " KO !!! for eta" << std::endl;
+
+           
+      if (eta < etaMin[k] ) {
+                if(flag)  std::cout << " KO !!! for eta "
+              		      <<"  pT = "<<pt<<" k = "<<k<<"/"<<n_regions<<" eta : " << eta << " etaMin[k]: " << etaMin[k] << " etaMax[k]: " << etaMax[k]<<"\n";
+                continue;
+              }
+              if (eta > etaMax[k] ) {
+               	if(flag)  std::cout << " KO !!! for eta" 
+      		          <<"  pT = "<<pt<<" k = "<<k<<"/"<<n_regions<< " eta : " << eta << " etaMin[k]: " << etaMin[k] << " etaMax[k]: " << etaMax[k]<<"\n" ;
                 continue;
               }
 //              if (std::abs(reco::deltaPhi(phi, phi0[k])) > phi0margin[k] ) {
@@ -201,24 +217,34 @@ namespace {
 //              }
               if (phiMin[k] < phiMax[k] ){
 		if ( phi < phiMin[k] ) {
-         //         std::cout<<"k="<<k<<"/"<<n_regions<<" phi : " << phi << " phiMin[k]: " << phiMin[k] << " phiMax[k]: " << phiMax[k];
-         //         std::cout << " KO !!! for phi" << std::endl;
+            if(flag)     std::cout << " KO !!! for phi "
+                       <<"  pT = "<<pt<<" k = "<<k<<"/"<<n_regions<<" phi : " << phi << " phiMin[k]: " << phiMin[k] << " phiMax[k]: " << phiMax[k]<<"\n";
                 continue;
               	}
               if ( phi > phiMax[k]) {
-      	//	  std::cout<<"k="<<k<<"/"<<n_regions<< " phi : " << phi << " phiMin[k]: " << phiMin[k] << " phiMax[k]: " << phiMax[k] ;
-          //     	  std::cout << " KO !!! for phi" << std::endl;
+             	if(flag)  std::cout << " KO !!! for phi " 
+      		             <<"  pT = "<<pt<<" k="<<k<<"/"<<n_regions<< " phi : " << phi << " phiMin[k]: " << phiMin[k] << " phiMax[k]: " << phiMax[k]<<"\n" ;
                 continue;
               }
 	      }
 	    else  {
 		if ( phi < phiMin[k] && phi > phiMax[k] ) {
- //                 std::cout<<"k="<<k<<"/"<<n_regions<<" phi : " << phi << " phiMin[k]: " << phiMin[k] << " phiMax[k]: " << phiMax[k];
- //                 std::cout << " KO !!! for phi phitol etol = "<<phiTolerance_<<" , "<<etaTolerance_<< std::endl;
+              if(flag)  std::cout << " KO !!! for phi phitol etol = "<<phiTolerance_<<" , "<<etaTolerance_
+                 <<"  pT = "<<pt<<" k = "<<k<<"/"<<n_regions<<" phi : " << phi << " phiMin[k]: " << phiMin[k] << " phiMax[k]: " << phiMax[k]<<"\n";
                 continue;
               	}
 	    }
-              
+          
+        if (std::abs(reco::deltaPhi(phi, phi0[k])) > phi0margin[k] ) {
+            if(flag)  std::cout << " KOKOKO !!! for phi " 
+                      <<" k = "<<k<<"/"<<n_regions<< " phi : " << phi << " phi0[k]: " << phi0[k] << " std::abs(reco::deltaPhi(phi,phi0[k])): " << std::abs(reco::deltaPhi(phi,phi0[k])) << " phi0margin: " << phi0margin[k] << std::endl;
+                continue;
+              }
+        if(std::abs(delta_eta_trk->at(it*n_regions+k))>0.8){
+        std::cout<<"KO KO KO eta-0.5*(etaMax[k]+etaMin[k])) "<<eta-0.5*(etaMax[k]+etaMin[k])<<" eta : " << eta << " etaMin[k]: " << etaMin[k] << " etaMax[k]: " << etaMax[k]<<" delta  " <<delta_eta_trk->at(it);
+        delta_eta_trk->at(it*n_regions+k)=eta-0.5*(etaMax[k]+etaMin[k]);
+        std::cout<<" ->  "<<delta_eta_trk->at(it*n_regions+k)<<"\n";
+            }
 	      output_tracks->push_back(trk);
               mask->at(it) = true;
               break;
@@ -228,8 +254,9 @@ namespace {
         }
         assert(mask->size() == tracks.size());
       }
-     if( mask->size()>0)
-        std::cout<<" Adding "<<output_tracks->size()<<"tracks \n";
+
+//     if( mask->size()>0)
+        std::cout<<" Adding "<<output_tracks->size()<<" / "<<mask->size()<<" tracks (nregions = "<<n_regions<<" ) \n";
      
      iEvent.put(std::move(mask));
      iEvent.put(std::move(output_tracks));
@@ -242,6 +269,8 @@ namespace {
     edm::EDGetTokenT<edm::OwnVector<TrackingRegion>> inputTrkRegionToken_;
     float phiTolerance_;
     float etaTolerance_;
+    float dXYTolerance_;
+    float dZTolerance_;
     float minPt_;
   
   };
