@@ -51,6 +51,7 @@ public:
                                               float gz = 0,
                                               float dr = 0,
                                               float dz = 0) const override;
+  TrackingRegion::MaskCollection trackSelection(reco::TrackCollection const& InputCollection) const override;
 
   std::unique_ptr<TrackingRegion> clone() const override { return std::make_unique<GlobalTrackingRegion>(*this); }
 

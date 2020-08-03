@@ -17,6 +17,10 @@
 #include "DataFormats/TrackerRecHit2D/interface/BaseTrackerRecHit.h"
 #include "DataFormats/TrackingRecHit/interface/mayown_ptr.h"
 
+#include "DataFormats/TrackReco/interface/TrackFwd.h"
+#include "DataFormats/TrackReco/interface/Track.h"
+#include "DataFormats/TrackReco/interface/TrackBase.h"
+
 class OuterHitPhiPrediction;
 class BarrelDetLayer;
 class ForwardDetLayer;
@@ -174,6 +178,8 @@ public:
   bool isPrecise() const { return thePrecise; }
 
   TrackingRegion::Hits hits(const edm::EventSetup& es, const SeedingLayerSetsHits::SeedingLayer& layer) const override;
+  TrackingRegion::MaskCollection trackSelection(reco::TrackCollection const& InputCollection) const override;
+
 
   std::unique_ptr<HitRZCompatibility> checkRZ(const DetLayer* layer,
                                               const Hit& outerHit,

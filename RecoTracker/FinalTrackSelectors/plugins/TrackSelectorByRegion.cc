@@ -151,17 +151,11 @@ namespace {
             RBound.push_back(etaPhiRegion->originRBound()*dXYTolerance_);
             
            }
-            else
-            {
-                std::cout<<"Bad region input !!"<<"\n";
-                 edm::LogWarning <<"Region not supported !!"<<"\n";
-            }
-
 
           size_t it = 0;
     //      if( tracks.size()>0)
     //        std::cout << "tracks: " << tracks.size() << std::endl;
-          bool flag=false;
+          bool flag=true;
           for (auto const& trk : tracks) {
             const auto pt = trk.pt();
             const auto eta = trk.eta();
@@ -254,7 +248,6 @@ namespace {
         }
         assert(mask->size() == tracks.size());
       }
-
 //     if( mask->size()>0)
         std::cout<<" Adding "<<output_tracks->size()<<" / "<<mask->size()<<" tracks (nregions = "<<n_regions<<" ) \n";
      

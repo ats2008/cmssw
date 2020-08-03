@@ -115,3 +115,33 @@ std::unique_ptr<HitRZCompatibility> GlobalTrackingRegion::checkRZ(const DetLayer
     return std::make_unique<HitRCheck>(rzConstraint, HitRCheck::Margin(corr, corr));
   }
 }
+
+TrackingRegion::MaskCollection GlobalTrackingRegion::trackSelection(reco::TrackCollection const& InputCollection) const 
+{
+    TrackingRegion::MaskCollection mask(InputCollection.size(),false);
+    int it=-1;
+    math::XYZPoint regOrigin(origin().x(), origin().y(), origin().z());
+    for(auto const & track: InputCollection)
+    {
+        it++;
+       if( track.pt()<ptMin() )
+        {
+            std::cout<<"gtr KO for pt = "<<track.pt()<<" by  pt  track.pt() < ptMin() "<<track.pt()<<" < "<<ptMin()<<std::endl;
+            continue;
+        }
+      if(std::abs(track.dxy(regOrigin) ) > originRBound())
+        {
+            std::cout<<"gtr KO for pt = "<<track.pt()<<" by  dxy  std::abs( "<<track.dxy(regOrigin)<<" ) > "<< originRBound()<<std::endl;
+            continue;
+        } 
+      if(std::abs(track.dz(regOrigin)) > originZBound())
+        {
+            std::cout<<"gtr KO for pt = "<<track.pt()<<" by  dxy  std::abs( "<<track.dz(regOrigin)<<" ) > "<< originZBound()<<std::endl;
+            continue;
+        }
+
+        mask[it]=true;
+    }
+     
+  return mask;
+}

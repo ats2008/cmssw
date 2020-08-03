@@ -47,6 +47,47 @@ namespace {
 using namespace PixelRecoUtilities;
 using namespace std;
 
+TrackingRegion::MaskCollection RectangularEtaPhiTrackingRegion::trackSelection(reco::TrackCollection const& InputCollection)  const
+{
+    TrackingRegion::MaskCollection mask(InputCollection.size(),false);
+    int it=-1;
+    math::XYZPoint regOrigin(origin().x(), origin().y(), origin().z());
+    for(auto const & track: InputCollection)
+    {
+        it++;
+        if( track.pt()<ptMin() )
+        {
+            std::cout<<"reptr KO for pt = "<<track.pt()<<" by  pt  track.pt() < ptMin() "<<track.pt()<<" < "<<ptMin()<<std::endl;
+            continue;
+        }
+
+        if( ! etaRange().inside(track.eta()) )
+        {
+            std::cout<<"reptr KO for pt = "<<track.pt()<<" by  eta  etaRange().inside("<<track.eta()<<") : "<<etaRange().inside(track.eta())<<" : "<<etaRange().min()
+                  <<etaRange().max()<<std::endl;
+            continue;
+        }
+        if( std::abs(reco::deltaPhi(track.phi(),phiDirection())) > phiMargin().right())
+        {
+            std::cout<<"reptr KO for pt = "<<track.pt()<<" by  phi std::abs(reco::deltaPhi("<<track.phi()<<","<<phiDirection()<<")) "<<" < "<< phiMargin().right()<<std::endl;
+            continue;
+        }
+        if(std::abs(track.dxy(regOrigin) ) > originRBound())
+        {
+            std::cout<<"reptr KO for pt = "<<track.pt()<<" by  dxy  std::abs( "<<track.dxy(regOrigin)<<" ) > "<< originRBound()<<std::endl;
+            continue;
+        } 
+        if(std::abs(track.dz(regOrigin)) > originZBound())
+        {
+            std::cout<<"reptr KO for pt = "<<track.pt()<<" by  dxy  std::abs( "<<track.dz(regOrigin)<<" ) > "<< originZBound()<<std::endl;
+            continue;
+        }
+        mask[it]=true;
+    }
+     
+  return mask;
+}
+
 RectangularEtaPhiTrackingRegion::UseMeasurementTracker RectangularEtaPhiTrackingRegion::stringToUseMeasurementTracker(
     const std::string& name) {
   std::string tmp = name;

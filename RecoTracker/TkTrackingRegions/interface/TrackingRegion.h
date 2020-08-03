@@ -19,6 +19,9 @@
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "TrackingTools/TransientTrackingRecHit/interface/SeedingLayerSetsHits.h"
 
+#include "DataFormats/TrackReco/interface/Track.h"
+#include "DataFormats/TrackReco/interface/TrackFwd.h"
+
 #include <utility>
 
 #include <sstream>
@@ -37,6 +40,7 @@ namespace edm {
 
 class TrackingRegion {
 public:
+using MaskCollection = std::vector<bool>;
 public:
   virtual ~TrackingRegion() {}
   typedef PixelRecoRange<float> Range;
@@ -96,7 +100,10 @@ public:
   /// get hits from layer compatible with region constraints
   virtual Hits hits(const edm::EventSetup& es, const SeedingLayerSetsHits::SeedingLayer& layer) const = 0;
 
-  /// clone region with new vertex position
+ /// return a mask over a track collection reflecting the compatability to the region
+  virtual MaskCollection trackSelection( reco::TrackCollection const& InputCollection) const =0; 
+ 
+ /// clone region with new vertex position
   std::unique_ptr<TrackingRegion> restrictedRegion(const GlobalPoint& originPos,
                                                    const float& originRBound,
                                                    const float& originZBound) const {
@@ -120,6 +127,8 @@ public:
   // void setDirection(const GlobalVector & dir ) { theDirection = dir; }
 
 private:
+
+
   GlobalVector theDirection;      // this is not direction is momentum...
   GlobalVector theUnitDirection;  // the real direction
   GlobalPoint theVertexPos;
