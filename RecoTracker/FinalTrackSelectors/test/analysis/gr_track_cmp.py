@@ -187,6 +187,7 @@ print "Total Number of Events = ",events.size()
 
 true_trk_count=0
 GvR_trk_count=0
+RvR_trk_count=0
 evtCount=0
 trigEvtCount=0
 for i, event in enumerate(events):
@@ -271,17 +272,20 @@ for i, event in enumerate(events):
             ptMissed_hist.Fill(track_RegionalReco[idx].pt())
             MissedDeltaR2_hist.Fill(matched_deltaR2[idx])
         if RvR_mask[idx]:
+            RvR_trk_count+=1
             tree_RvR.Fill()
         else:
             tree_RvR_missed.Fill()
     dell_idx=0
     nGvR_tracks=track_GvR.size()
     nGlobalReco_tracks=GvR_mask.size()
-
+    if nGvR_tracks!=0:
+        print "nGvR_tracks ",nGvR_tracks," GvR_track_ndel_eta ",GvR_track_ndel_eta.size()," nGlobalReco_tracks ",nGlobalReco_tracks
     if nGvR_tracks>0:
-        print "GvR_track_ndel_eta.size()/GvR_mask.size() = ",GvR_track_ndel_eta.size(),"/",GvR_mask.size()
-        nRegions[0]=GvR_track_ndel_eta.size()/GvR_mask.size()
-
+#        print "GvR_track_ndel_eta.size()/GvR_mask.size() = ",GvR_track_ndel_eta.size(),"/",GvR_mask.size()
+        nRegions[0]=GvR_track_ndel_eta.size()/nGlobalReco_tracks
+    else:
+        nRegions[0]=0
     idx=-1
     for jdx in range(nGlobalReco_tracks):
         if not GvR_mask[jdx]:
@@ -306,6 +310,9 @@ for i, event in enumerate(events):
             deltar2[0]=matched_deltaR2[idxm]
             deltar2X[0]=matched_deltaR2X[idxm]
             tree_GvR_matched.Fill()
+            for j in range(nRegions[0]):
+                if abs(ndelleta[j])>0.8:
+                    print "ndelleta[j] : ",ndelleta[j]," [ ",j," ] ",nRegions[0]
             MatchedDeltaR2_hist.Fill(deltar2[0])
             MatchedDeltaR2X_hist.Fill(deltar2X[0])
         else:
@@ -315,7 +322,8 @@ for i, event in enumerate(events):
 print "total number of events processed : ",evtCount
 print "total number of events ggered evts : ",trigEvtCount
 print "true tracks ",true_trk_count
-print "selcted tracks ", GvR_trk_count
+print "selcted rvr tracks ", RvR_trk_count
+print "selcted gvr tracks ", GvR_trk_count
 
 afile.cd()
 ptMissed_hist.Write()
