@@ -10,7 +10,6 @@ def d2(v1,v2):
     return (v1[0]-v2[0])**2+(v1[1]-v2[1])**2+(v1[2]-v2[2])**2
 
 def printVertex(vertex): 
-    print "Miss at i = ",i
     print "        x = ",vertex[0]
     print "        y = ",vertex[1]
     print "        z = ",vertex[2]
@@ -31,24 +30,6 @@ def getComparison(vertexA,vertexB):
             if d<1e-8:
                 ma[i]=True
                 mb[j]=True
-#                print i,j, " Matching legacy "
-#                print "        x = ",vertexA[i][0]
-#                print "        y = ",vertexA[i][1]
-#                print "        z = ",vertexA[i][2]
-#                print "     chi2 = ",vertexA[i][3]
-#                print "    nchi2 = ",vertexA[i][5]
-#                print "     ndof = ",vertexA[i][4]
-#                print "trackSize = ",vertexA[i][6]
-#                print "to CUDA "
-#                print "        x = ",vertexB[i][0]
-#                print "        y = ",vertexB[i][1]
-#                print "        z = ",vertexB[i][2]
-#                print "     chi2 = ",vertexB[i][3]
-#                print "    nchi2 = ",vertexB[i][5]
-#                print "     ndof = ",vertexB[i][4]
-#                print "trackSize = ",vertexB[i][6]
-
-
     return ma,mb               
 
 def DoMatchingTest(ValidationRawFile,VertexCollectionA,VertexCollectionB,printVtx=False):
@@ -114,11 +95,6 @@ def DoMatchingTest(ValidationRawFile,VertexCollectionA,VertexCollectionB,printVt
             addlCount+=mb.count(False)
     print "Miss count = ",missCount
     print "Additional count = ",addlCount
-
-#DoMatchingTest(ValidationRawFile,'hltTrimmedPixelVertices','hltTrimmedPixelVerticesValidation')
-DoMatchingTest(ValidationRawFile,'hltTrimmedPixelVertices','hltTrimmedPixelVerticesCPUValidation',False)
-
-          
 
 def makeVertexNtuples(ValidationRawFile,VertexCollection,recreateFile=False,fOutName="VertexNtuples.root"):
     
@@ -202,16 +178,24 @@ def makeVertexNtuples(ValidationRawFile,VertexCollection,recreateFile=False,fOut
 
 
 
+if __name__== "__main__" :
+    
+    DO_EVENT_BY_EVENT_MATCH=True
+    DO_CONVERSION_TO_NTUPLETS=True
 
-makenewFile=True
-count=0
+    if(DO_EVENT_BY_EVENT_MATCH):
+        print(" Doing Event by event matching of the collections ")
+        DoMatchingTest(ValidationRawFile,'hltTrimmedPixelVertices','hltTrimmedPixelVerticesValidation',printVtx=True)
+        #DoMatchingTest(ValidationRawFile,'hltTrimmedPixelVerticesCPUValidation','hltTrimmedPixelVerticesValidation',printVtx=True)
+        #DoMatchingTest(ValidationRawFile,'hltTrimmedPixelVertices','hltTrimmedPixelVerticesCPUValidation',printVtx=True)
 
-verticesofInterest=['hltPixelVertices','hltTrimmedPixelVertices','hltTrimmedPixelVerticesValidation','hltTrimmedPixelVerticesCPUValidation']
-
-print len(verticesofInterest) 
-for verexCol in verticesofInterest:
- #   break
-    count+=1
-    print "\n\n doing  ",count,"  / ",len(verticesofInterest)
-    makeVertexNtuples(ValidationRawFile,verexCol,makenewFile)
-    makenewFile=False
+    if(DO_CONVERSION_TO_NTUPLETS):
+        makenewFile=True
+        count=0
+        verticesofInterest=['hltPixelVertices','hltTrimmedPixelVertices','hltTrimmedPixelVerticesValidation','hltTrimmedPixelVerticesCPUValidation']
+        print("CONVERTING TO ROOT NTUPLETS ")
+        for verexCol in verticesofInterest:
+            count+=1
+            print "\n\n doing  ",count,"  / ",len(verticesofInterest)
+            makeVertexNtuples(ValidationRawFile,verexCol,makenewFile)
+            makenewFile=False

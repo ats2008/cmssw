@@ -32,8 +32,6 @@ namespace gpuVertexFinder {
     }
   };
 
-
-
   __global__ void init(ZVertexSoA* pdata, WorkSpace* pws) {
     pdata->init();
     pws->init();
@@ -79,9 +77,6 @@ namespace gpuVertexFinder {
     float errmax;   // max error to be "seed"
     float chi2max;  // max normalized distance to cluster
   };
-
-
-
 
 }  // namespace gpuVertexFinder
 

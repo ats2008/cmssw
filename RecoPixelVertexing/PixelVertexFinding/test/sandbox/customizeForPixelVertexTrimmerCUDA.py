@@ -12,6 +12,9 @@ def customizeForValidation(process):
 #  desc.add<double>("track_chi2_max", 99999.0)->setComment("max track_chi2");
 #  desc.add<double>("track_prob_min", 1.0)->setComment("min track_prob");
 
+    TrkProbaMin = 0.25
+    process.HLTPSetPvClusterComparerForIT.track_prob_min=cms.double(TrkProbaMin)
+    
     process.hltTrimmedPixelVerticesCUDAValidation= cms.EDProducer("PixelVertexCollectionTrimmerCUDA",
         onGPU = cms.bool(True),
         fractionSumPt2 = cms.double(0.3),
@@ -23,7 +26,7 @@ def customizeForValidation(process):
         track_pT_min = cms.double(1.0),
         track_pT_max =  cms.double(20.0),
         track_chi2_max =  cms.double(20.0),
-        track_prob_min =  cms.double(-1.0)
+        track_prob_min =  cms.double(TrkProbaMin)
    )
 
     process.hltTrimmedPixelVerticesSoAValidation = cms.EDProducer("PixelVertexSoAFromCUDA",
@@ -70,7 +73,7 @@ def customizeForValidation(process):
         track_pT_min = cms.double(1.0),
         track_pT_max =  cms.double(20.0),
         track_chi2_max =  cms.double(20.0),
-        track_prob_min =  cms.double(-1.0)
+        track_prob_min =  cms.double(TrkProbaMin)
    )
    
     process.hltTrimmedPixelVerticesCPUValidation = cms.EDProducer("PixelVertexProducerFromSoA",

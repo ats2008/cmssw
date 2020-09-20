@@ -7,38 +7,32 @@
 #include "CUDADataFormats/Vertex/interface/ZVertexHeterogeneous.h"
 #include "TMath.h"
 
-#define MAX_NDOF_EXPECTED 20
-
 namespace gpuVertexTrimmer {
 
   using ZVertices = ZVertexSoA;
   using TkSoA = pixelTrack::TrackSoA;
 
-  struct WorkSpaceTr {
+ struct WorkSpaceTr {
     static constexpr uint32_t MAXTRACKS = ZVertexSoA::MAXTRACKS;
     static constexpr uint32_t MAXVTX = ZVertexSoA::MAXVTX;
 
     uint32_t ntrks;                        // number of "selected tracks"
     uint16_t itrk[MAXTRACKS];              // index of original track
-    float chi2max[MAX_NDOF_EXPECTED + 1];  // input error^2 on the above
-    float chi2ndof[MAXTRACKS];             // input error^2 on the above
-    float ptt2[MAXTRACKS];                 // input pt^2 on the above
+    float chi2max[20];                     // chi2max/ndof for ndof=1,...,20 for pixel trk max(ndof)=5
+//    float chi2ndof[MAXTRACKS];             // input error^2 on the above
+//    float ptt2[MAXTRACKS];                 // input pt^2 on the above
     float sumPtt2[MAXVTX];                 // sum pt^2 for each new vertex
-    int32_t iv[MAXTRACKS];                 // vertex index for each associated track
+//    int32_t iv[MAXTRACKS];                 // vertex index for each associated track
     int32_t nTracksFromVertex[MAXVTX];     // index of the vertex in trimmed collection
     int32_t newVtxIds[MAXVTX];             // index of the vertex in trimmed collection
     float maxSumPt2;
     __host__ __device__ void init() {
       ntrks = 0;
       maxSumPt2 = 0.0;
-      for (size_t i = 0; i < ZVertexSoA::MAXVTX; i++) {
-        sumPtt2[i] = 0.0;
-        nTracksFromVertex[i] = 0;
-      }
     }
   };
-  //dflekfefkp
-  __global__ void init(ZVertexSoA* pdata, WorkSpaceTr* pws) {
+  
+ __global__ void init(ZVertexSoA* pdata, WorkSpaceTr* pws) {
     pdata->init();
     pws->init();
   }
@@ -68,7 +62,6 @@ namespace gpuVertexTrimmer {
     ~Trimmer() = default;
     ZVertexHeterogeneous makeAsync(cudaStream_t stream, TkSoA const* tksoa, ZVertexSoA const* VertexSoA) const;
     ZVertexHeterogeneous make(TkSoA const* tksoa, ZVertexSoA const* VertexSoA) const;
-    //ZVertexHeterogeneous make(PixelTrackHeterogeneous const tksoa,ZVertexHeterogeneous const  VertexSoA) const;
 
   private:
     unsigned int maxVtx_;   // max output collection size (number of accepted vertices)
@@ -80,7 +73,6 @@ namespace gpuVertexTrimmer {
     float track_prob_min_;  // min track_prob TODO figure out how to use the chi2quantile
     float chi2Max_;         // TODO check original legacy code and adapt accordingly
   };
-
 }  // namespace gpuVertexTrimmer
 
 #endif  // RecoPixelVertexing_PixelVertexFinding_src_gpuVertexTrimmer_h

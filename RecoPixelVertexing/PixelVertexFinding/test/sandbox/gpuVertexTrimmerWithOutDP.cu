@@ -1,27 +1,63 @@
-#include "CUDADataFormats/Track/interface/PixelTrackHeterogeneous.h"
-#include "HeterogeneousCore/CUDAUtilities/interface/cudaCheck.h"
 #include "gpuVertexTrimmer.h"
+#include "HeterogeneousCore/CUDAUtilities/interface/radixSort.h"
+
 
 namespace gpuVertexTrimmer {
+ 
+    __global__ void initWorkspaceTr(WorkSpaceTr* pws){
+    auto idx =blockIdx.x * blockDim.x + threadIdx.x;
+        printf("init idx = %d [MAXVTX = %d ]\n",idx,ZVertexSoA::MAXVTX);
+      if (idx < ZVertexSoA::MAXVTX) {
+        pws->sumPtt2[idx] = 0.0;
+        pws->nTracksFromVertex[idx] = 0;
+      }
+    }
+    __global__ void initWorkspaceTrWrapper(WorkSpaceTr* pws,const ZVertexSoA* Verteices  ){
 
+        auto nv= Verteices->nvFinal;
+        auto blockSize=128;
+        auto numberOfBlocks =(nv +blockSize -1)/blockSize;
+        if(nv<blockSize) blockSize=nv;
+        initWorkspaceTr<<<numberOfBlocks,blockSize,0>>>(pws);
+    }
+
+    __global__ void sortByPt2(ZVertices* pdata) {
+
+    auto& __restrict__ data = *pdata;
+    uint32_t const& nvFinal = data.nvFinal;
+    float* __restrict__ ptv2 = data.ptv2;
+    uint16_t* __restrict__ sortInd = data.sortInd;
+
+    if (nvFinal < 1)
+      return;
+
+    if (1 == nvFinal) {
+      if (threadIdx.x == 0)
+        sortInd[0] = 0;
+      return;
+    }
+    __shared__ uint16_t sws[1024];
+    
+    // sort using only 16 bits
+    radixSort<float, 2>(ptv2, sortInd, sws, nvFinal);
+    
+    }
+
+  
   // parallel on all tracks
-  // selects th
   __global__ void sumPt2(TkSoA const* ptracks,
                          ZVertexSoA const* pVertexSoa,
-                         ZVertexSoA* trimmedVertexSoa,
                          gpuVertexTrimmer::WorkSpaceTr* pws,
                          float ptMin,
                          float ptMax,
                          int minHits) {
     assert(ptracks);
     assert(pVertexSoa);
-    assert(trimmedVertexSoa);
     assert(pws);
 
     auto const& tracks = *ptracks;
     auto& vertexs = *pVertexSoa;
-    auto& trimmedVertexs = *trimmedVertexSoa;
-    auto& data = *pws;
+    auto& ws = *pws;
     auto const* quality = tracks.qualityData();
 
     auto first = blockIdx.x * blockDim.x + threadIdx.x;
@@ -30,19 +66,18 @@ namespace gpuVertexTrimmer {
       if (nHits == 0)
         break;  // this is a guard: maybe we need to move to nTracks...
 
-      atomicAdd(&(data.ntrks), 1);
+      atomicAdd(&(ws.ntrks), 1);
       auto vid = vertexs.idv[idx];
-      data.iv[idx] = vid;
 
       auto ndof = 2 * nHits - 5;
       if (ndof < 0)
         ndof = 0;
-      // printf("sumpT2 kernel : checking track id %d with vid : %d ,chi2 = %f ,ndof = %d, chi2max =%f , pt = %f, ptMin =%f,pTmax = %f \n",
-      //         idx,vid,tracks.chi2(idx),ndof,data.chi2max[ndof],tracks.pt(idx),ptMin,ptMax);
+   //    printf("sumpT2 kernel : checking trk id %d with vid : %d ,chi2 = %f ,ndof = %d, chi2max =%f , pt = %f, ptMin =%f,pTmax = %f \n",
+   //            idx,vid,tracks.chi2(idx),ndof,ws.chi2max[ndof],tracks.pt(idx),ptMin,ptMax);
       if (vid < 0)
         continue;
 
-      atomicAdd(&data.nTracksFromVertex[vid], 1);
+      atomicAdd(&ws.nTracksFromVertex[vid], 1);
       if (nHits < minHits)
         continue;
       if (quality[idx] != trackQuality::loose)
@@ -50,7 +85,7 @@ namespace gpuVertexTrimmer {
 
       auto chi2 = tracks.chi2(idx);
 
-      if (chi2 > data.chi2max[ndof])
+      if (chi2 > ws.chi2max[ndof])
         continue;
 
       auto pt = tracks.pt(idx);
@@ -58,7 +93,7 @@ namespace gpuVertexTrimmer {
         continue;
       if (pt > ptMax)
         pt = ptMax;
-      atomicAdd(&data.sumPtt2[vid], pt * pt);
+      atomicAdd(&ws.sumPtt2[vid], pt * pt);
       //printf("sumpT2 kernel : adding track id %d with vid : %d ,and pT set as : %f [ tempsum =%f ]\n",idx,vid,pt,tempsum);
     }
   }
@@ -75,11 +110,11 @@ namespace gpuVertexTrimmer {
     if (idx < nv) {
       ws.newVtxIds[idx] = -1;
       //     idx=vtxSoa.sortInd[idx];
-      printf("in getPt2max , idx = %d , sortIdx = %d ->nv = %d  sumpT2 =%f \n",
-             idx,
-             vtxSoa.sortInd[idx],
-             nv,
-             ws.sumPtt2[idx]);
+     // printf("in getPt2max , idx = %d , sortIdx = %d ->nv = %d  sumpT2 =%f \n",
+     //        idx,
+     //        vtxSoa.sortInd[idx],
+     //        nv,
+     //        ws.sumPtt2[idx]);
       if (idx == nv - 1) {
         auto sid = vtxSoa.sortInd[idx];
         while (ws.nTracksFromVertex[sid] < 2 and idx > 0) {
@@ -88,8 +123,8 @@ namespace gpuVertexTrimmer {
         }
         //           idx=vtxSoa.sortInd[idx];
         ws.maxSumPt2 = ws.sumPtt2[sid] * fractionSumPt2;
-        printf(
-            "in getPt2max  FOUND MAX AS : @idx = %d[%d] ,pTMax = %f [ %f ]\n ", idx, nv, ws.maxSumPt2, ws.sumPtt2[sid]);
+       // printf(
+       //     "in getPt2max  FOUND MAX AS : @idx = %d[%d] ,pTMax = %f [ %f ]\n ", idx, nv, ws.maxSumPt2, ws.sumPtt2[sid]);
         //printf("found sortId = %d , ws.maxSumPt2=ws.sumPtt2[%d]*fractionSumPt2 :: %f=%f * %f \n",
         //                      idx,idx,ws.maxSumPt2,ws.sumPtt2[idx],fractionSumPt2);
       }
@@ -109,11 +144,11 @@ namespace gpuVertexTrimmer {
 
     if (idx < nv) {
       //        idx=origVtxs.sortInd[idx];
-      printf("ntrks = %d, sumPt2 = %f , sumpTmin = %f , sumPtMax = %f \n",
-             ws.nTracksFromVertex[idx],
-             ws.sumPtt2[idx],
-             sumPtMin,
-             ws.maxSumPt2);
+      //printf("ntrks = %d, sumPt2 = %f , sumpTmin = %f , sumPtMax = %f \n",
+      //       ws.nTracksFromVertex[idx],
+      //       ws.sumPtt2[idx],
+      //       sumPtMin,
+      //       ws.maxSumPt2);
       if (ws.nTracksFromVertex[idx] > 1 and ws.sumPtt2[idx] > sumPtMin and ws.sumPtt2[idx] > ws.maxSumPt2) {
         auto i = atomicAdd(&trimmedVertices.nvFinal, 1);
         ws.newVtxIds[idx] = i;
@@ -122,15 +157,15 @@ namespace gpuVertexTrimmer {
         trimmedVertices.chi2[i] = origVtxs.chi2[idx];
         trimmedVertices.ptv2[i] = origVtxs.ptv2[idx];
         trimmedVertices.ndof[i] = origVtxs.ndof[idx];
-        trimmedVertices.sortInd[i] = i;  //TODO
-        printf("adding new i = %d old idx = %d {zv : %f ,wv : %f ,chi2 : %f ,ptv2 : %f ,ndof : %d }\n",
-               i,
-               idx,
-               trimmedVertices.zv[i],
-               trimmedVertices.wv[i],
-               trimmedVertices.chi2[i],
-               trimmedVertices.ptv2[i],
-               trimmedVertices.ndof[i]);
+     //   trimmedVertices.sortInd[i] = i;  //TODO
+        //printf("adding new i = %d old idx = %d {zv : %f ,wv : %f ,chi2 : %f ,ptv2 : %f ,ndof : %d }\n",
+        //       i,
+        //       idx,
+        //       trimmedVertices.zv[i],
+        //       trimmedVertices.wv[i],
+        //       trimmedVertices.chi2[i],
+        //       trimmedVertices.ptv2[i],
+        //       trimmedVertices.ndof[i]);
 
         //           printf("adding new i = %d old idx = %d ptv2_original =%f , here : %f, max = %f\n",i,idx,trimmedVertices.ptv2[i],ws.sumPtt2[idx],ws.maxSumPt2);
       }
@@ -166,7 +201,20 @@ namespace gpuVertexTrimmer {
     }
   }
 
-#ifdef __CUDACC__
+  __global__ void printVtx(gpuVertexTrimmer::ZVertices* tVertices)
+  {
+    assert(tVertices);
+
+    auto& trimmedVertices = *tVertices;
+
+    auto idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    if (idx < trimmedVertices.nvFinal) {
+      printf("idx = %d ptt2 = %f , sortInd = %d  \n ",idx,trimmedVertices.ptv2[idx],trimmedVertices.sortInd[idx]) ;
+  }
+  }
+
+
   void updateMaxChi2(size_t ndof, float* maxChi2, float track_prob_min, float maxChi2set) {
     if (track_prob_min > 0 and track_prob_min <= 1.0) {
       for (size_t i = 1; i <= ndof; i++) {
@@ -201,16 +249,22 @@ namespace gpuVertexTrimmer {
     auto ws_tr = cms::cuda::make_device_unique<WorkSpaceTr>(stream);
     auto* workspace = ws_tr.get();
 
-    auto maxchi2valsCPU = cms::cuda::make_host_unique<float[]>(MAX_NDOF_EXPECTED + 1, stream);
-    updateMaxChi2(MAX_NDOF_EXPECTED, maxchi2valsCPU.get(), track_prob_min_, chi2Max_);
+    auto maxchi2valsCPU = cms::cuda::make_host_unique<float[]>(20, stream);
+    updateMaxChi2(20, maxchi2valsCPU.get(), track_prob_min_, chi2Max_);
+    std::cout<<"Chi2 Max Values made as \n" ;
+    for(int i=0;i<8;i++)
+        std::cout<<"ndof  = "<<i<<" chi2Max = "<<maxchi2valsCPU[i]<<"\n";
     cudaMemcpyAsync(workspace->chi2max,
                     maxchi2valsCPU.get(),
-                    (MAX_NDOF_EXPECTED + 1) * sizeof(float),
+                    20 * sizeof(float),
                     cudaMemcpyHostToDevice,
                     stream);
 
     //std::cout<<"Going to the init kernel \n"; //with numberOfBlocks = "<<numberOfBlocks<<" mN"<<minNumberOfHits_<<" c2M "<<chi2Max_<<"\n";
     init<<<1, 1, 0, stream>>>(trimmedVertexSoA, ws_tr.get());
+
+    initWorkspaceTrWrapper<<<1,1,0,stream>>>(workspace,VertexSoA);
+    
     //std::cout<<"out of init kernel \n";
     cudaCheck(cudaGetLastError());
     std::cout << "passed checkerror of init kernel \n";
@@ -223,7 +277,7 @@ namespace gpuVertexTrimmer {
 
     //std::cout<<"Going to the sumPt2 kernel with numberOfBlocks = "<<numberOfBlocks<<" mN"<<minNumberOfHits_<<" c2M "<<chi2Max_<<"\n";
     sumPt2<<<numberOfBlocks, blockSize, 0, stream>>>(
-        tksoa, VertexSoA, trimmedVertexSoA, workspace, track_pT_min_, track_pT_max_, minNumberOfHits_);
+        tksoa, VertexSoA, workspace, track_pT_min_, track_pT_max_, minNumberOfHits_);
     //std::cout<<"out of sumPt2 kernel \n";
     cudaCheck(cudaGetLastError());
     // std::cout<<"passed checkerror of sumPt2 kernel \n";
@@ -235,7 +289,7 @@ namespace gpuVertexTrimmer {
     //std::cout<<"passed checkerror of getPt2max kernel \n";
 
     //std::cout<<"updating the number of Blocks now with VertexSoA->nvFinal - ...\n ";
-    numberOfBlocks = (20 + blockSize - 1) / blockSize;
+    numberOfBlocks = (ZVertexSoA::MAXVTX + blockSize - 1) / blockSize;
     //std::cout<<"Going to the vertextrimmer kernel with numberOfBlocks = "<<numberOfBlocks<<"\n";
     vertexTrimmer<<<numberOfBlocks, blockSize, 0, stream>>>(trimmedVertexSoA, VertexSoA, workspace, minSumPt2_);
     //std::cout<<"out of vertexTrimmer kernel \n";
@@ -248,135 +302,18 @@ namespace gpuVertexTrimmer {
     //std::cout<<"out of updateTrackVertexMap kernel \n";
     cudaCheck(cudaGetLastError());
     //std::cout<<"passed checkerror of updateTrackVertexMap kernel \n";
+    numberOfBlocks = (ZVertexSoA::MAXVTX + blockSize - 1) / blockSize;
+    std::cout<<"going to sort by pT2 \n";
+    sortByPt2<<<1,1024 - 256,0,stream>>>(trimmedVertexSoA);
+    std::cout<<"passed checkerror of sumpt2 kernel \n";
+    std::cout<<"going to printVtx \n";
+    printVtx<<<numberOfBlocks,blockSize,0,stream>>>(trimmedVertexSoA);
+    std::cout<<"passed checkerror of printVtx kernel \n";
+    cudaCheck(cudaGetLastError());
     std::cout << "exiting AsyncFuc \n";
 
     return vertices;
   }
 
-#endif
-
-  void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double track_prob_min) {
-    size_t oldsize = maxChi2.size();
-    for (size_t i = oldsize; i <= ndof; ++i) {
-      double chi2 = TMath::ChisquareQuantile(1 - track_prob_min, i);
-      maxChi2.push_back(chi2);
-    }
-  }
-
-  ZVertexHeterogeneous Trimmer::make(TkSoA const* tksoa, ZVertexSoA const* VertexSoA) const {
-    assert(tksoa);
-    assert(VertexSoA);
-    
-    ZVertexHeterogeneous vertices(std::make_unique<ZVertexSoA>());
-    auto& trimmedVertexSoA = *vertices;//.get();
-    //auto trimmed_VtxSoA_ptr = std::make_unique<ZVertexSoA>();
-    
-    auto vertex_soa = *VertexSoA;
-    int nv = vertex_soa.nvFinal;
-
-    auto tsoa = *tksoa;
-    auto const* quality = tsoa.qualityData();
-    unsigned int maxTracks(tsoa.stride());
-
-    double sumpt2;
-
-    trimmedVertexSoA.nvFinal = 0;
-    int vtx_id;
-
-    double sumpt2first = 0;
-    std::vector<double> track_pT2;
-    std::vector<double> maxChi2_;
-
-    unsigned int it = 0;
-
-    for (it = 0; it < maxTracks; it++) {
-      trimmedVertexSoA.idv[it] = -1;
-      track_pT2.push_back(-1.0);
-      auto nHits = tsoa.nHits(it);
-
-      if (nHits == 0)
-        break;  // this is a guard: maybe we need to move to nTracks...
-      auto q = quality[it];
-      if (q != trackQuality::loose)
-        continue;  // FIXME
-      if (nHits < minNumberOfHits_)
-        continue;
-
-      size_t ndof = 2 * nHits - 5;
-      float chi2 = tsoa.chi2(it);
-
-      if (track_prob_min_ >= 0. && track_prob_min_ <= 1.) {
-        if (maxChi2_.size() <= (ndof))
-          updateChisquareQuantile(ndof, maxChi2_, track_prob_min_);
-        if (chi2 * ndof > maxChi2_[ndof])
-          continue;
-      }
-      if (chi2 > chi2Max_)
-        continue;
-
-      float pt = tsoa.pt(it);
-      if (pt < track_pT_min_)
-        continue;
-      if (pt > track_pT_max_)
-        pt = track_pT_max_;
-      track_pT2.back() = pt * pt;
-    }
-    maxTracks = it;
-
-    auto nt = 0;
-    for (int j = nv - 1; j >= 0; j--) {
-      vtx_id = vertex_soa.sortInd[j];
-      sumpt2first = 0;
-      nt = 0;
-      for (unsigned int k = 0; k < maxTracks; k++) {
-        if (vertex_soa.idv[k] != vtx_id)
-          continue;
-        nt++;
-        if (track_pT2[k] < 0)
-          continue;
-        auto pt2 = track_pT2[k];
-        sumpt2first += pt2;
-      }
-      if (nt > 1)
-        break;
-    }
-
-    trimmedVertexSoA.nvFinal = 0;
-    for (int j = 0; j < nv; j++) {
-      if (trimmedVertexSoA.nvFinal >= maxVtx_)
-        break;
-      vtx_id = vertex_soa.sortInd[j];
-      sumpt2 = 0;
-      nt = 0;
-      for (unsigned int k = 0; k < maxTracks; k++) {
-        if (vertex_soa.idv[k] != vtx_id)
-          continue;
-        nt++;
-        if (track_pT2[k] < 0)
-          continue;
-        sumpt2 += track_pT2[k];
-      }
-      if (nt < 2)
-        continue;
-      if (sumpt2 >= sumpt2first * fractionSumPt2_ && sumpt2 > minSumPt2_) {
-        auto newVtxId = trimmedVertexSoA.nvFinal;
-        for (unsigned int k = 0; k < maxTracks; k++) {
-          if (vertex_soa.idv[k] == vtx_id)
-            trimmedVertexSoA.idv[k] = newVtxId;
-        }
-
-        trimmedVertexSoA.zv[newVtxId] = vertex_soa.zv[vtx_id];
-        trimmedVertexSoA.wv[newVtxId] = vertex_soa.wv[vtx_id];
-        trimmedVertexSoA.chi2[newVtxId] = vertex_soa.chi2[vtx_id];
-        trimmedVertexSoA.sortInd[newVtxId] = newVtxId;
-        trimmedVertexSoA.ndof[newVtxId] = vertex_soa.ndof[vtx_id];
-        trimmedVertexSoA.ptv2[newVtxId] = vertex_soa.ptv2[vtx_id];
-        trimmedVertexSoA.nvFinal++;
-      }
-    }
-    std::cout << "\n";
- //   return ZVertexHeterogeneous(std::move(trimmed_VtxSoA_ptr));
-    return vertices; 
-  }
-
 }  // namespace gpuVertexTrimmer
+
