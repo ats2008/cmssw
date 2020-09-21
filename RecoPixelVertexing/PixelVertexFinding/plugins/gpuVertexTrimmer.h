@@ -9,36 +9,33 @@
 
 namespace gpuVertexTrimmer {
 
-  using ZVertices = ZVertexSoA;
   using TkSoA = pixelTrack::TrackSoA;
+  using ZVertices = ZVertexSoA;
 
- struct WorkSpaceTr {
-    static constexpr uint32_t MAXTRACKS = ZVertexSoA::MAXTRACKS;
-    static constexpr uint32_t MAXVTX = ZVertexSoA::MAXVTX;
+  struct WorkSpace {
+    static constexpr uint32_t MAXTRACKS = ZVertices::MAXTRACKS;
+    static constexpr uint32_t MAXVTX = ZVertices::MAXVTX;
 
-    uint32_t ntrks;                        // number of "selected tracks"
-    uint16_t itrk[MAXTRACKS];              // index of original track
-    float chi2max[20];                     // chi2max/ndof for ndof=1,...,20 for pixel trk max(ndof)=5
-    float sumPtt2[MAXVTX];                 // sum pt^2 for each new vertex
-    int32_t nTracksFromVertex[MAXVTX];     // index of the vertex in trimmed collection
-    int32_t newVtxIds[MAXVTX];             // index of the vertex in trimmed collection
+    uint32_t ntrks;                     // number of "selected tracks"
+    uint16_t itrk[MAXTRACKS];           // index of original track
+    float chi2max[20];                  // chi2max/ndof for ndof=1,...,20 for pixel trk max(ndof)=5
+    float sumPtt2[MAXVTX];              // sum pt^2 for each new vertex
+    int32_t nTracksFromVertex[MAXVTX];  // index of the vertex in trimmed collection
+    int32_t newVtxIds[MAXVTX];          // index of the vertex in trimmed collection
     float maxSumPt2;
     __host__ __device__ void init() {
       ntrks = 0;
       maxSumPt2 = 0.0;
     }
   };
-  
- __global__ void init(ZVertexSoA* pdata, WorkSpaceTr* pws) {
+
+  __global__ void init(ZVertices* pdata, WorkSpace* pws) {
     pdata->init();
     pws->init();
   }
 
   class Trimmer {
   public:
-    using ZVertices = ZVertexSoA;
-    using TkSoA = pixelTrack::TrackSoA;
-
     Trimmer(int maxVtx,
             float fractionSumPt2,
             float minSumPt2,
@@ -57,8 +54,8 @@ namespace gpuVertexTrimmer {
           chi2Max_(chi2Max) {}
 
     ~Trimmer() = default;
-    ZVertexHeterogeneous makeAsync(cudaStream_t stream, TkSoA const* tksoa, ZVertexSoA const* VertexSoA) const;
-    ZVertexHeterogeneous make(TkSoA const* tksoa, ZVertexSoA const* VertexSoA) const;
+    ZVertexHeterogeneous makeAsync(cudaStream_t stream, TkSoA const* tksoa, ZVertices const* VertexSoA) const;
+    ZVertexHeterogeneous make(TkSoA const* tksoa, ZVertices const* VertexSoA) const;
 
   private:
     unsigned int maxVtx_;   // max output collection size (number of accepted vertices)

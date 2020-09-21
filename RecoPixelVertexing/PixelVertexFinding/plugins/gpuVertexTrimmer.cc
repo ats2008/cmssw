@@ -2,11 +2,10 @@
 #include "gpuVertexTrimmer.h"
 #include "CUDADataFormats/Track/interface/PixelTrackHeterogeneous.h"
 #include "HeterogeneousCore/CUDAUtilities/interface/cudaCheck.h"
- 
 
- 
 namespace gpuVertexTrimmer {
-void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double track_prob_min) {
+
+  void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double track_prob_min) {
     size_t oldsize = maxChi2.size();
     for (size_t i = oldsize; i <= ndof; ++i) {
       double chi2 = TMath::ChisquareQuantile(1 - track_prob_min, i);
@@ -17,10 +16,10 @@ void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double t
   ZVertexHeterogeneous Trimmer::make(TkSoA const* tksoa, ZVertexSoA const* VertexSoA) const {
     assert(tksoa);
     assert(VertexSoA);
-    
+
     ZVertexHeterogeneous vertices(std::make_unique<ZVertexSoA>());
     auto& trimmedVertexSoA = *vertices;
-    
+
     auto vertex_soa = *VertexSoA;
     int nv = vertex_soa.nvFinal;
 
@@ -38,7 +37,7 @@ void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double t
     std::vector<double> maxChi2_;
 
     unsigned int it = 0;
-
+    // track selection + pT2 finding
     for (it = 0; it < maxTracks; it++) {
       trimmedVertexSoA.idv[it] = -1;
       track_pT2.push_back(-1.0);
@@ -48,7 +47,7 @@ void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double t
         break;  // this is a guard: maybe we need to move to nTracks...
       auto q = quality[it];
       if (q != trackQuality::loose)
-        continue; 
+        continue;
       if (nHits < minNumberOfHits_)
         continue;
 
@@ -124,8 +123,6 @@ void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double t
         trimmedVertexSoA.nvFinal++;
       }
     }
-    std::cout << "\n";
-    return vertices; 
+    return vertices;
   }
 }  // namespace gpuVertexTrimmer
-
