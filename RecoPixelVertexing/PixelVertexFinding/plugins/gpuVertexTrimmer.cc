@@ -19,8 +19,7 @@ void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double t
     assert(VertexSoA);
     
     ZVertexHeterogeneous vertices(std::make_unique<ZVertexSoA>());
-    auto& trimmedVertexSoA = *vertices;//.get();
-    //auto trimmed_VtxSoA_ptr = std::make_unique<ZVertexSoA>();
+    auto& trimmedVertexSoA = *vertices;
     
     auto vertex_soa = *VertexSoA;
     int nv = vertex_soa.nvFinal;
@@ -49,7 +48,7 @@ void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double t
         break;  // this is a guard: maybe we need to move to nTracks...
       auto q = quality[it];
       if (q != trackQuality::loose)
-        continue;  // FIXME
+        continue; 
       if (nHits < minNumberOfHits_)
         continue;
 
@@ -126,7 +125,6 @@ void updateChisquareQuantile(size_t ndof, std::vector<double>& maxChi2, double t
       }
     }
     std::cout << "\n";
- //   return ZVertexHeterogeneous(std::move(trimmed_VtxSoA_ptr));
     return vertices; 
   }
 }  // namespace gpuVertexTrimmer

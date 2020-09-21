@@ -19,10 +19,7 @@ namespace gpuVertexTrimmer {
     uint32_t ntrks;                        // number of "selected tracks"
     uint16_t itrk[MAXTRACKS];              // index of original track
     float chi2max[20];                     // chi2max/ndof for ndof=1,...,20 for pixel trk max(ndof)=5
-//    float chi2ndof[MAXTRACKS];             // input error^2 on the above
-//    float ptt2[MAXTRACKS];                 // input pt^2 on the above
     float sumPtt2[MAXVTX];                 // sum pt^2 for each new vertex
-//    int32_t iv[MAXTRACKS];                 // vertex index for each associated track
     int32_t nTracksFromVertex[MAXVTX];     // index of the vertex in trimmed collection
     int32_t newVtxIds[MAXVTX];             // index of the vertex in trimmed collection
     float maxSumPt2;
