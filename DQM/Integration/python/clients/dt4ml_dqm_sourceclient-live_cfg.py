@@ -14,12 +14,15 @@ if 'unitTest=True' in sys.argv:
 #----------------------------
 if unitTest:
     process.load("DQM.Integration.config.unittestinputsource_cfi")
+    from DQM.Integration.config.unittestinputsource_cfi import options
 else:
     # for live online DQM in P5
     process.load("DQM.Integration.config.inputsource_cfi")
+    from DQM.Integration.config.inputsource_cfi import options
 
 # for testing in lxplus
 #process.load("DQM.Integration.config.fileinputsource_cfi")
+#from DQM.Integration.config.fileinputsource_cfi import options
 
 #----------------------------
 #### DQM Environment
@@ -31,12 +34,17 @@ process.load("DQM.Integration.config.environment_cfi")
 #----------------------------
 process.dqmEnv.subSystemFolder = 'DT'
 process.dqmSaver.tag = "DT"
+process.dqmSaver.runNumber = options.runNumber
+process.dqmSaverPB.tag = "DT"
+process.dqmSaverPB.runNumber = options.runNumber
 #-----------------------------
 
 ### CUSTOMIZE FOR ML
 
 # prepare the output directory
 filePath = "/globalscratch/dqm4ml_" + process.dqmRunConfig.type.value()
+if unitTest:
+    filePath = "./dqm4ml_" + process.dqmRunConfig.type.value()
 try:
     os.makedirs(filePath)
 except:
@@ -45,8 +53,8 @@ except:
 process.dqmSaver.backupLumiCount = 10
 process.dqmSaver.keepBackupLumi = True
 
-if not unitTest:
-    process.dqmSaver.path = filePath
+process.dqmSaver.path = filePath
+process.dqmSaverPB.path = filePath + "/pb"
 
 # disable DQM gui
 print("old:",process.DQM.collectorHost)
@@ -70,7 +78,7 @@ process.MessageLogger = cms.Service("MessageLogger",
                                     cout = cms.untracked.PSet(threshold = cms.untracked.string('WARNING'))
                                     )
 
-process.dqmmodules = cms.Sequence(process.dqmEnv + process.dqmSaver)
+process.dqmmodules = cms.Sequence(process.dqmEnv + process.dqmSaver + process.dqmSaverPB)
 
 process.dtDQMPathPhys = cms.Path(process.unpackers + process.dqmmodules + process.physicsEventsFilter *  process.dtDQMPhysSequence)
 

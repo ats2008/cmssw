@@ -19,14 +19,16 @@ public:
 
   static bool maskCell(int u, int v, int N, int ncor, int fcor, int corners);
   static bool goodCell(int u, int v, int N, int type, int rotn);
+  static int getRotation(int zside, int type, int rotn);
   static std::pair<int, int> getTypeMode(const double& xpos,
                                          const double& ypos,
                                          const double& delX,
                                          const double& delY,
                                          const double& rin,
                                          const double& rout,
-                                         const int& nw,
-                                         const int& mode);
+                                         const int& waferType,
+                                         const int& mode,
+                                         bool deug = false);
   static const int k_OffsetRotation = 10;
 };
 

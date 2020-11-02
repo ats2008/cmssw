@@ -18,7 +18,6 @@
 #include "Geometry/Records/interface/DDSpecParRegistryRcd.h"
 
 #include "DetectorDescription/DDCMS/interface/DDDetector.h"
-#include "DetectorDescription/DDCMS/interface/DDShapes.h"
 #include "DetectorDescription/DDCMS/interface/DDSolidShapes.h"
 #include "DetectorDescription/DDCMS/interface/DDFilteredView.h"
 #include "DetectorDescription/DDCMS/interface/DDSpecParRegistry.h"
@@ -122,11 +121,11 @@ void DD4hep_TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::E
   edm::LogVerbatim("Geometry").log([&specs](auto& log) {
     log << "Filtered DD SpecPar Registry size: " << specs.size() << "\n";
     for (const auto& t : specs) {
-      log << "\nRegExps { ";
-      for (const auto& ki : t->paths)
+      log << "\nSpecPar " << t.first << ":\nRegExps { ";
+      for (const auto& ki : t.second->paths)
         log << ki << " ";
       log << "};\n ";
-      for (const auto& kl : t->spars) {
+      for (const auto& kl : t.second->spars) {
         log << kl.first << " = ";
         for (const auto& kil : kl.second) {
           log << kil << " ";
@@ -194,8 +193,8 @@ void DD4hep_TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::E
       bool isSens = false;
 
       for (auto const& t : specs) {
-        for (auto const& it : t->paths) {
-          if (dd::compareEqual(fv.name(), dd::realTopName(it))) {
+        for (auto const& it : t.second->paths) {
+          if (dd4hep::dd::compareEqual(fv.name(), dd4hep::dd::realTopName(it))) {
             isSens = true;
             break;
           }
@@ -207,6 +206,7 @@ void DD4hep_TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::E
         // Test of numbering scheme for sensitive detectors
         //
 
+        std::stringstream sunitt;
         std::stringstream snum;
 
         if (isBarrel) {
@@ -214,6 +214,7 @@ void DD4hep_TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::E
           BTLDetId theId(btlNS_.getUnitID(thisN_));
           int hIndex = theId.hashedIndex(lay);
           BTLDetId theNewId(theId.getUnhashedIndex(hIndex, lay));
+          sunitt << theId.rawId();
           snum << theId << "\n layout type = " << static_cast<int>(lay) << "\n ieta        = " << theId.ieta(lay)
                << "\n iphi        = " << theId.iphi(lay) << "\n hashedIndex = " << theId.hashedIndex(lay)
                << "\n BTLDetId hI = " << theNewId;
@@ -235,6 +236,7 @@ void DD4hep_TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::E
           snum << "\n";
         } else {
           ETLDetId theId(etlNS_.getUnitID(thisN_));
+          sunitt << theId.rawId();
           snum << theId;
         }
         edm::LogInfo("DD4hep_TestMTDNumbering") << snum.str();
@@ -251,14 +253,14 @@ void DD4hep_TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::E
           return ss.str();
         };
 
-        if (!fv.isABox()) {
+        if (!dd4hep::isA<dd4hep::Box>(fv.solid())) {
           throw cms::Exception("TestMTDIdealGeometry") << "MTD sensitive element not a DDBox";
           break;
         }
-        dd::DDBox mySens(fv);
-        spos << "Solid shape name: " << DDSolidShapesName::name(fv.legacyShape(dd::getCurrentShape(fv))) << "\n";
-        spos << "Box dimensions: " << fround(convertCmToMm(mySens.halfX())) << " "
-             << fround(convertCmToMm(mySens.halfY())) << " " << fround(convertCmToMm(mySens.halfZ())) << "\n";
+        dd4hep::Box mySens(fv.solid());
+        spos << "Solid shape name: " << DDSolidShapesName::name(fv.legacyShape(fv.shape())) << "\n";
+        spos << "Box dimensions: " << fround(convertCmToMm(mySens.x())) << " " << fround(convertCmToMm(mySens.y()))
+             << " " << fround(convertCmToMm(mySens.z())) << "\n";
 
         DD3Vector x, y, z;
         fv.rotation().GetComponents(x, y, z);
@@ -270,7 +272,7 @@ void DD4hep_TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::E
              << fround(z.Y()) << " " << fround(z.Z()) << "\n";
 
         DD3Vector zeroLocal(0., 0., 0.);
-        DD3Vector cn1Local(mySens.halfX(), mySens.halfY(), mySens.halfZ());
+        DD3Vector cn1Local(mySens.x(), mySens.y(), mySens.z());
         double distLocal = cn1Local.R();
         DD3Vector zeroGlobal = (fv.rotation())(zeroLocal) + fv.translation();
         DD3Vector cn1Global = (fv.rotation())(cn1Local) + fv.translation();
@@ -292,7 +294,12 @@ void DD4hep_TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::E
         if (std::fabs(convertCmToMm(distGlobal - distLocal)) > 1.e-6) {
           spos << "DIFFERENCE IN DISTANCE \n";
         }
+        sunitt << fround(convertCmToMm(zeroGlobal.X())) << fround(convertCmToMm(zeroGlobal.Y()))
+               << fround(convertCmToMm(zeroGlobal.Z())) << fround(convertCmToMm(cn1Global.X()))
+               << fround(convertCmToMm(cn1Global.Y())) << fround(convertCmToMm(cn1Global.Z()));
         edm::LogInfo("DD4hep_TestMTDPosition") << spos.str();
+
+        edm::LogVerbatim("MTDUnitTest") << sunitt.str();
       }
     }
   } while (fv.next(0));

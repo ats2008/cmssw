@@ -19,6 +19,7 @@
 #include "FWCore/Framework/interface/ComponentDescription.h"
 #include "FWCore/Framework/interface/DataProxyProvider.h"
 #include "FWCore/Framework/interface/EDConsumerBase.h"
+#include "FWCore/Framework/interface/ConsumesCollector.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/Framework/interface/ESTransientHandle.h"
 #include "FWCore/Framework/interface/ESRecordsToProxyIndices.h"
@@ -28,6 +29,7 @@
 #include "FWCore/Framework/interface/IOVSyncValue.h"
 #include "FWCore/Framework/interface/RecordDependencyRegister.h"
 #include "FWCore/Framework/interface/NoRecordException.h"
+#include "FWCore/Framework/interface/MakeDataException.h"
 #include "FWCore/Framework/interface/ValidityInterval.h"
 
 #include "FWCore/Framework/src/EventSetupsController.h"
@@ -41,9 +43,9 @@
 #include "FWCore/ServiceRegistry/interface/ActivityRegistry.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include "FWCore/Utilities/interface/ESProductTag.h"
+#include "FWCore/Concurrency/interface/ThreadsController.h"
 
 #include "cppunit/extensions/HelperMacros.h"
-#include "tbb/task_scheduler_init.h"
 
 #include <memory>
 #include <optional>
@@ -103,7 +105,7 @@ class testEventsetup : public CppUnit::TestFixture {
   CPPUNIT_TEST_SUITE_END();
 
 public:
-  void setUp() { m_scheduler = std::make_unique<tbb::task_scheduler_init>(1); }
+  void setUp() { m_scheduler = std::make_unique<edm::ThreadsController>(1); }
   void tearDown() {}
 
   void constructTest();
@@ -135,7 +137,7 @@ public:
   void resetProxiesTest();
 
 private:
-  edm::propagate_const<std::unique_ptr<tbb::task_scheduler_init>> m_scheduler;
+  edm::propagate_const<std::unique_ptr<edm::ThreadsController>> m_scheduler;
 
   DummyData kGood{1};
   DummyData kBad{0};
@@ -565,84 +567,157 @@ void testEventsetup::getDataWithESInputTagTest() {
 
 namespace {
   struct DummyDataConsumer : public EDConsumerBase {
-    explicit DummyDataConsumer(ESInputTag const& iTag)
-        : m_token{esConsumes<edm::eventsetup::test::DummyData, edm::DefaultRecord>(iTag)} {}
+    explicit DummyDataConsumer(ESInputTag const& iTag) : m_token{esConsumes(iTag)} {}
+
+    void prefetch(edm::EventSetupImpl const& iImpl) const {
+      auto const& recs = this->esGetTokenRecordIndicesVector(edm::Transition::Event);
+      auto const& proxies = this->esGetTokenIndicesVector(edm::Transition::Event);
+      for (size_t i = 0; i != proxies.size(); ++i) {
+        auto rec = iImpl.findImpl(recs[i]);
+        if (rec) {
+          auto waitTask = edm::make_empty_waiting_task();
+          waitTask->set_ref_count(2);
+          rec->prefetchAsync(waitTask.get(), proxies[i], &iImpl, edm::ServiceToken{});
+          waitTask->decrement_ref_count();
+          waitTask->wait_for_all();
+          if (waitTask->exceptionPtr()) {
+            std::rethrow_exception(*waitTask->exceptionPtr());
+          }
+        }
+      }
+    }
 
     ESGetToken<edm::eventsetup::test::DummyData, edm::DefaultRecord> m_token;
+    ESGetToken<edm::eventsetup::test::DummyData, edm::DefaultRecord> m_tokenUninitialized;
   };
 
-  class ConsumesProducer : public ESProducer {
-  public:
-    ConsumesProducer() : token_{setWhatProduced(this, "consumes").consumes<edm::eventsetup::test::DummyData>()} {}
-    std::unique_ptr<edm::eventsetup::test::DummyData> produce(const DummyRecord& iRecord) {
-      auto const& data = iRecord.get(token_);
-      return std::make_unique<edm::eventsetup::test::DummyData>(data);
-    }
+  //This just tests that the constructs will properly compile
+  class [[maybe_unused]] EDConsumesCollectorConsumer
+      : public edm::EDConsumerBase{EDConsumesCollectorConsumer(){using edm::eventsetup::test::DummyData;
+  {
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token1(
+        consumesCollector().esConsumes<DummyData, edm::DefaultRecord>());
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token2(
+        consumesCollector().esConsumes<DummyData, edm::DefaultRecord>(edm::ESInputTag("Blah")));
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token3(
+        consumesCollector().esConsumes<DummyData, edm::DefaultRecord, edm::Transition::BeginRun>());
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token4(
+        consumesCollector().esConsumes<DummyData, edm::DefaultRecord, edm::Transition::BeginRun>(
+            edm::ESInputTag("Blah")));
+  }
+  {
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token1(consumesCollector().esConsumes());
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token2(
+        consumesCollector().esConsumes(edm::ESInputTag("Blah")));
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token3(
+        consumesCollector().esConsumes<edm::Transition::BeginRun>());
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token4(
+        consumesCollector().esConsumes<edm::Transition::BeginRun>(edm::ESInputTag("Blah")));
+  }
+  {
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token1;
+    token1 = consumesCollector().esConsumes();
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token2;
+    token2 = consumesCollector().esConsumes(edm::ESInputTag("Blah"));
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token3;
+    token3 = consumesCollector().esConsumes<edm::Transition::BeginRun>();
+    [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token4;
+    token4 = consumesCollector().esConsumes<edm::Transition::BeginRun>(edm::ESInputTag("Blah"));
+  }
 
-  private:
-    edm::ESGetToken<edm::eventsetup::test::DummyData, DummyRecord> token_;
-  };
+}  // namespace
+}
+;
 
-  class ConsumesFromProducer : public ESProducer {
-  public:
-    ConsumesFromProducer()
-        : token_{setWhatProduced(this, "consumesFrom").consumesFrom<edm::eventsetup::test::DummyData, DummyRecord>()} {}
-    std::unique_ptr<edm::eventsetup::test::DummyData> produce(const DummyRecord& iRecord) {
-      auto const& data = iRecord.get(token_);
-      return std::make_unique<edm::eventsetup::test::DummyData>(data);
-    }
+class ConsumesProducer : public ESProducer {
+public:
+  ConsumesProducer() : token_{setWhatProduced(this, "consumes").consumes<edm::eventsetup::test::DummyData>()} {}
+  std::unique_ptr<edm::eventsetup::test::DummyData> produce(const DummyRecord& iRecord) {
+    auto const& data = iRecord.get(token_);
+    return std::make_unique<edm::eventsetup::test::DummyData>(data);
+  }
 
-  private:
-    edm::ESGetToken<edm::eventsetup::test::DummyData, DummyRecord> token_;
-  };
+private:
+  edm::ESGetToken<edm::eventsetup::test::DummyData, DummyRecord> token_;
+};
 
-  class SetConsumesProducer : public ESProducer {
-  public:
-    SetConsumesProducer() { setWhatProduced(this, "setConsumes").setConsumes(token_); }
-    std::unique_ptr<edm::eventsetup::test::DummyData> produce(const DummyRecord& iRecord) {
-      auto const& data = iRecord.get(token_);
-      return std::make_unique<edm::eventsetup::test::DummyData>(data);
-    }
+class ConsumesFromProducer : public ESProducer {
+public:
+  ConsumesFromProducer()
+      : token_{setWhatProduced(this, "consumesFrom").consumesFrom<edm::eventsetup::test::DummyData, DummyRecord>()} {}
+  std::unique_ptr<edm::eventsetup::test::DummyData> produce(const DummyRecord& iRecord) {
+    auto const& data = iRecord.get(token_);
+    return std::make_unique<edm::eventsetup::test::DummyData>(data);
+  }
 
-  private:
-    edm::ESGetToken<edm::eventsetup::test::DummyData, DummyRecord> token_;
-  };
+private:
+  edm::ESGetToken<edm::eventsetup::test::DummyData, DummyRecord> token_;
+};
 
-  class SetMayConsumeProducer : public ESProducer {
-  public:
-    SetMayConsumeProducer(bool iSucceed) : succeed_(iSucceed) {
-      setWhatProduced(this, label(iSucceed))
-          .setMayConsume(
-              token_,
-              [iSucceed](auto& get, edm::ESTransientHandle<edm::eventsetup::test::DummyData> const& handle) {
-                if (iSucceed) {
-                  return get("", "");
-                }
-                return get.nothing();
-              },
-              edm::ESProductTag<edm::eventsetup::test::DummyData, DummyRecord>("", ""));
-    }
-    std::unique_ptr<edm::eventsetup::test::DummyData> produce(const DummyRecord& iRecord) {
-      CPPUNIT_ASSERT(succeed_ == token_.hasValidIndex());
-      auto const& data = iRecord.getHandle(token_);
-      CPPUNIT_ASSERT(data.isValid() == succeed_);
-      if (data.isValid()) {
-        return std::make_unique<edm::eventsetup::test::DummyData>(*data);
+//This is used only to test compilation
+class [[maybe_unused]] ESConsumesCollectorProducer : public ESProducer {
+public:
+  struct Helper {
+    Helper(ESConsumesCollector iCollector) {
+      using edm::eventsetup::test::DummyData;
+      {
+        [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token1(
+            iCollector.consumesFrom<DummyData, edm::DefaultRecord>());
+        [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token2(
+            iCollector.consumesFrom<DummyData, edm::DefaultRecord>(edm::ESInputTag("Blah")));
       }
-      return std::make_unique<edm::eventsetup::test::DummyData>();
-    }
-
-  private:
-    static const char* label(bool iSucceed) noexcept {
-      if (iSucceed) {
-        return "setMayConsumeSucceed";
+      {
+        [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token1(iCollector.consumes());
+        [[maybe_unused]] edm::ESGetToken<DummyData, edm::DefaultRecord> token2(
+            iCollector.consumes(edm::ESInputTag("Blah")));
       }
-      return "setMayConsumeFail";
     }
-
-    edm::ESGetToken<edm::eventsetup::test::DummyData, DummyRecord> token_;
-    bool succeed_;
   };
+
+  ESConsumesCollectorProducer() : helper_(setWhatProduced(this, "consumesCollector")) {}
+
+  std::unique_ptr<edm::eventsetup::test::DummyData> produce(const DummyRecord& iRecord) {
+    return std::unique_ptr<edm::eventsetup::test::DummyData>();
+  }
+
+private:
+  Helper helper_;
+};
+
+class SetMayConsumeProducer : public ESProducer {
+public:
+  SetMayConsumeProducer(bool iSucceed) : succeed_(iSucceed) {
+    setWhatProduced(this, label(iSucceed))
+        .setMayConsume(
+            token_,
+            [iSucceed](auto& get, edm::ESTransientHandle<edm::eventsetup::test::DummyData> const& handle) {
+              if (iSucceed) {
+                return get("", "");
+              }
+              return get.nothing();
+            },
+            edm::ESProductTag<edm::eventsetup::test::DummyData, DummyRecord>("", ""));
+  }
+  std::unique_ptr<edm::eventsetup::test::DummyData> produce(const DummyRecord& iRecord) {
+    auto const& data = iRecord.getHandle(token_);
+    CPPUNIT_ASSERT(data.isValid() == succeed_);
+    if (data.isValid()) {
+      return std::make_unique<edm::eventsetup::test::DummyData>(*data);
+    }
+    return std::unique_ptr<edm::eventsetup::test::DummyData>();
+  }
+
+private:
+  static const char* label(bool iSucceed) noexcept {
+    if (iSucceed) {
+      return "setMayConsumeSucceed";
+    }
+    return "setMayConsumeFail";
+  }
+
+  edm::ESGetToken<edm::eventsetup::test::DummyData, DummyRecord> token_;
+  bool succeed_;
+};
 
 }  // namespace
 
@@ -701,17 +776,6 @@ void testEventsetup::getDataWithESGetTokenTest() {
       provider.add(dummyProv);
     }
     {
-      edm::eventsetup::ComponentDescription description("SetConsumesProducer", "setConsumes", false);
-      edm::ParameterSet ps;
-      ps.addParameter<std::string>("name", "setConsumes");
-      ps.registerIt();
-      description.pid_ = ps.id();
-      auto dummyProv = std::make_shared<SetConsumesProducer>();
-      dummyProv->setDescription(description);
-      dummyProv->setAppendToDataLabel(ps);
-      provider.add(dummyProv);
-    }
-    {
       edm::eventsetup::ComponentDescription description("SetMayConsumeProducer", "setMayConsumeSuceed", false);
       edm::ParameterSet ps;
       ps.addParameter<std::string>("name", "setMayConsumeSuceed");
@@ -738,17 +802,27 @@ void testEventsetup::getDataWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "blah")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
                             true};
       auto const& data = eventSetup.getData(consumer.m_token);
       CPPUNIT_ASSERT(kGood.value_ == data.value_);
+      bool uninitializedTokenThrewException = false;
+      try {
+        (void)eventSetup.getData(consumer.m_tokenUninitialized);
+      } catch (cms::Exception& ex) {
+        uninitializedTokenThrewException = true;
+        CPPUNIT_ASSERT(ex.category() == "InvalidESGetToken");
+      }
+      CPPUNIT_ASSERT(uninitializedTokenThrewException);
     }
 
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
@@ -760,6 +834,7 @@ void testEventsetup::getDataWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("testTwo", "blah")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
@@ -771,6 +846,7 @@ void testEventsetup::getDataWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("DoesNotExist", "blah")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
@@ -781,6 +857,7 @@ void testEventsetup::getDataWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "consumes")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
@@ -791,16 +868,7 @@ void testEventsetup::getDataWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "consumesFrom")};
       consumer.updateLookup(provider.recordsToProxyIndices());
-      EventSetup eventSetup{provider.eventSetupImpl(),
-                            static_cast<unsigned int>(edm::Transition::Event),
-                            consumer.esGetTokenIndices(edm::Transition::Event),
-                            true};
-      const DummyData& data = eventSetup.getData(consumer.m_token);
-      CPPUNIT_ASSERT(kBad.value_ == data.value_);
-    }
-    {
-      DummyDataConsumer consumer{edm::ESInputTag("", "setConsumes")};
-      consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
@@ -811,15 +879,17 @@ void testEventsetup::getDataWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "setMayConsumeFail")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
                             true};
-      CPPUNIT_ASSERT_THROW(eventSetup.getData(consumer.m_token), cms::Exception);
+      CPPUNIT_ASSERT_THROW(eventSetup.getData(consumer.m_token), edm::eventsetup::MakeDataException);
     }
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "setMayConsumeSucceed")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
@@ -870,6 +940,7 @@ void testEventsetup::getHandleWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "blah")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
 
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
@@ -884,6 +955,7 @@ void testEventsetup::getHandleWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
@@ -897,6 +969,7 @@ void testEventsetup::getHandleWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("testTwo", "blah")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
@@ -910,6 +983,7 @@ void testEventsetup::getHandleWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("DoesNotExist", "blah")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       EventSetup eventSetup{provider.eventSetupImpl(),
                             static_cast<unsigned int>(edm::Transition::Event),
                             consumer.esGetTokenIndices(edm::Transition::Event),
@@ -966,6 +1040,7 @@ void testEventsetup::getTransientHandleWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "blah")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       const edm::EventSetup eventSetup{provider.eventSetupImpl(),
                                        static_cast<unsigned int>(edm::Transition::Event),
                                        consumer.esGetTokenIndices(edm::Transition::Event),
@@ -979,6 +1054,7 @@ void testEventsetup::getTransientHandleWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("", "")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       const edm::EventSetup eventSetup{provider.eventSetupImpl(),
                                        static_cast<unsigned int>(edm::Transition::Event),
                                        consumer.esGetTokenIndices(edm::Transition::Event),
@@ -992,6 +1068,7 @@ void testEventsetup::getTransientHandleWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("testTwo", "blah")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       const edm::EventSetup eventSetup{provider.eventSetupImpl(),
                                        static_cast<unsigned int>(edm::Transition::Event),
                                        consumer.esGetTokenIndices(edm::Transition::Event),
@@ -1005,6 +1082,7 @@ void testEventsetup::getTransientHandleWithESGetTokenTest() {
     {
       DummyDataConsumer consumer{edm::ESInputTag("DoesNotExist", "blah")};
       consumer.updateLookup(provider.recordsToProxyIndices());
+      consumer.prefetch(provider.eventSetupImpl());
       const edm::EventSetup eventSetup{provider.eventSetupImpl(),
                                        static_cast<unsigned int>(edm::Transition::Event),
                                        consumer.esGetTokenIndices(edm::Transition::Event),

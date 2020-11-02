@@ -67,7 +67,7 @@ autoDQM = { 'DQMMessageLogger': ['DQMMessageLoggerSeq',
 
             'trackingZeroBias': ['DQMOfflineTrackingMinBias',
                        'PostDQMOffline',
-                       'DQMHarvestTracking+DQMCertTracking'],
+                       'DQMHarvestTrackingZeroBias+DQMCertTracking'],
 
 	    'hlt': ['DQMOfflineTrigger',
 		    'PostDQMOffline',
@@ -100,6 +100,15 @@ autoDQM = { 'DQMMessageLogger': ['DQMMessageLoggerSeq',
             'hcal2': ['DQMOfflineHcal2',
                       'PostDQMOffline',
                       'DQMHarvestHcal2'],
+
+            'hcalOnly': ['DQMOfflineHcalOnly',
+                         'PostDQMOffline',
+                         'DQMHarvestHcal'],
+
+            'hcal2Only': ['DQMOfflineHcal2Only',
+                          'PostDQMOffline',
+                          'DQMHarvestHcal2'],
+
 
             'jetmet': ['DQMOfflineJetMET',
                        'PostDQMOffline',
@@ -178,6 +187,10 @@ autoDQM = { 'DQMMessageLogger': ['DQMMessageLoggerSeq',
                            'DQMHarvestMiniAOD'],
 
             'nanoAODDQM': ['DQMOfflineNanoAOD',
+                           'PostDQMOffline',
+                           'DQMHarvestNanoAOD'],
+
+            'nanogenDQM': ['DQMOfflineNanoGen',
                            'PostDQMOffline',
                            'DQMHarvestNanoAOD'],
 

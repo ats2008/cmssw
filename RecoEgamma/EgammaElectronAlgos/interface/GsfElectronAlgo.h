@@ -45,6 +45,7 @@
 #include "TrackingTools/GsfTracking/interface/GsfConstraintAtVertex.h"
 #include "TrackingTools/MaterialEffects/interface/PropagatorWithMaterial.h"
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateOnSurface.h"
+#include "RecoEgamma/EgammaElectronAlgos/interface/ConversionFinder.h"
 
 class GsfElectronAlgo {
 public:
@@ -78,13 +79,15 @@ public:
     bool ecalDrivenEcalErrorFromClassBasedParameterization;
     bool pureTrackerDrivenEcalErrorFromSimpleParameterization;
     // ambiguity solving
-    bool applyAmbResolution;              // if not true, ambiguity solving is not applied
+    bool applyAmbResolution;  // if not true, ambiguity solving is not applied
+    bool ignoreNotPreselected;
     unsigned ambSortingStrategy;          // 0:isBetter, 1:isInnermost
     unsigned ambClustersOverlapStrategy;  // 0:sc adresses, 1:bc shared energy
     // for backward compatibility
     bool ctfTracksCheck;
     float PreSelectMVA;
     float MaxElePtForOnlyMVA;
+    bool useDefaultEnergyCorrection;
     // GED-Regression (ECAL and combination)
     bool useEcalRegression;
     bool useCombinationRegression;
@@ -135,10 +138,6 @@ public:
     bool isBarrel;
     bool isEndcaps;
     bool isFiducial;
-
-    // BDT output (if available)
-    double minMVA;
-    double minMvaByPassForIsolated;
 
     // transverse impact parameter wrt beam spot
     double maxTIP;
@@ -218,7 +217,9 @@ private:
                       CaloGeometry const& geometry,
                       MultiTrajectoryStateTransform const& mtsTransform,
                       double magneticFieldInTesla,
-                      const HeavyObjectCache*);
+                      const HeavyObjectCache*,
+                      egamma::conv::TrackTableView ctfTable,
+                      egamma::conv::TrackTableView gsfTable);
 
   void setCutBasedPreselectionFlag(reco::GsfElectron& ele, const reco::BeamSpot&) const;
 
@@ -237,10 +238,10 @@ private:
   // constant class members
   const Configuration cfg_;
 
-  const EleTkIsolFromCands tkIsol03Calc_;
-  const EleTkIsolFromCands tkIsol04Calc_;
-  const EleTkIsolFromCands tkIsolHEEP03Calc_;
-  const EleTkIsolFromCands tkIsolHEEP04Calc_;
+  const EleTkIsolFromCands::Configuration tkIsol03CalcCfg_;
+  const EleTkIsolFromCands::Configuration tkIsol04CalcCfg_;
+  const EleTkIsolFromCands::Configuration tkIsolHEEP03CalcCfg_;
+  const EleTkIsolFromCands::Configuration tkIsolHEEP04CalcCfg_;
 
   const edm::ESGetToken<MagneticField, IdealMagneticFieldRecord> magneticFieldToken_;
   const edm::ESGetToken<CaloGeometry, CaloGeometryRecord> caloGeometryToken_;

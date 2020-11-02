@@ -1,7 +1,6 @@
 import FWCore.ParameterSet.Config as cms
 
-from RecoHGCal.TICL.TICLSeedingRegions_cff import ticlSeedingGlobal
-from RecoHGCal.TICL.ticlLayerTileProducer_cfi import ticlLayerTileProducer as _ticlLayerTileProducer
+from RecoHGCal.TICL.TICLSeedingRegions_cff import ticlSeedingGlobal, ticlSeedingGlobalHFNose
 from RecoHGCal.TICL.trackstersProducer_cfi import trackstersProducer as _trackstersProducer
 from RecoHGCal.TICL.filteredLayerClustersProducer_cfi import filteredLayerClustersProducer as _filteredLayerClustersProducer
 from RecoHGCal.TICL.multiClustersFromTrackstersProducer_cfi import multiClustersFromTrackstersProducer as _multiClustersFromTrackstersProducer
@@ -19,7 +18,7 @@ filteredLayerClustersEM = _filteredLayerClustersProducer.clone(
 # CA - PATTERN RECOGNITION
 
 ticlTrackstersEM = _trackstersProducer.clone(
-    filtered_mask = cms.InputTag("filteredLayerClustersEM", "EM"),
+    filtered_mask = "filteredLayerClustersEM:EM",
     original_mask = 'ticlTrackstersTrk',
     seeding_regions = "ticlSeedingGlobal",
     filter_on_categories = [0, 1],
@@ -45,3 +44,26 @@ ticlEMStepTask = cms.Task(ticlSeedingGlobal
     ,ticlTrackstersEM
     ,ticlMultiClustersFromTrackstersEM)
 
+filteredLayerClustersHFNoseEM = filteredLayerClustersEM.clone(
+    LayerClusters = 'hgcalLayerClustersHFNose',
+    LayerClustersInputMask = "hgcalLayerClustersHFNose:InitialLayerClustersMask",
+    iteration_label = "EMn",
+    algo_number = 9
+#no tracking mask for EM for now
+)
+
+ticlTrackstersHFNoseEM = ticlTrackstersEM.clone(
+    detector = "HFNose",
+    layer_clusters = "hgcalLayerClustersHFNose",
+    layer_clusters_hfnose_tiles = "ticlLayerTileHFNose",
+    original_mask = "hgcalLayerClustersHFNose:InitialLayerClustersMask",
+    filtered_mask = "filteredLayerClustersHFNoseEM:EMn",
+    seeding_regions = "ticlSeedingGlobalHFNose",
+    time_layerclusters = "hgcalLayerClustersHFNose:timeLayerCluster",
+    min_clusters_per_ntuplet = 6
+)
+
+ticlHFNoseEMStepTask = cms.Task(ticlSeedingGlobalHFNose
+                              ,filteredLayerClustersHFNoseEM
+                              ,ticlTrackstersHFNoseEM
+)

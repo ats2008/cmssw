@@ -4,7 +4,6 @@
 ### Various set of customise functions needed for embedding
 from __future__ import print_function
 import FWCore.ParameterSet.Config as cms
-from FWCore.ParameterSet.Utilities import cleanUnscheduled
 
 import six
 
@@ -105,6 +104,8 @@ def customiseSelecting(process,reselect=False):
         dataTier="SELECT"
 
     process.load('TauAnalysis.MCEmbeddingTools.SelectingProcedure_cff')
+    # don't rekey TrackExtra refs because the full original collections are anyways stored
+    process.slimmedMuons.trackExtraAssocs = []
     process.patMuonsAfterKinCuts.src = cms.InputTag("slimmedMuons","",dataTier)
     process.patMuonsAfterID = process.patMuonsAfterLooseID.clone()
 

@@ -79,15 +79,18 @@ void GEMeMap::convertDummy(GEMROMapping& romap) {
   uint8_t gebId = 0;
 
   for (int re = -1; re <= 1; re = re + 2) {
-    for (int st = GEMDetId::minStationId; st <= GEMDetId::maxStationId; ++st) {
+    for (int st = GEMDetId::minStationId0; st <= GEMDetId::maxStationId; ++st) {
       int maxVFat = maxVFatGE11_;
-      if (st == 2)
+      int maxLayerId = GEMDetId::maxLayerId;
+      if (GEMSubDetId::station(st) == GEMSubDetId::Station::GE21)
         maxVFat = maxVFatGE21_;
-      if (st == 0)
+      if (GEMSubDetId::station(st) == GEMSubDetId::Station::GE0) {
         maxVFat = maxVFatGE0_;
+        maxLayerId = GEMDetId::maxLayerId0;
+      }
 
       for (int ch = 1; ch <= GEMDetId::maxChamberId; ++ch) {
-        for (int ly = 1; ly <= GEMDetId::maxLayerId; ++ly) {
+        for (int ly = 1; ly <= maxLayerId; ++ly) {
           GEMDetId gemId(re, 1, st, ly, ch, 0);
 
           GEMROMapping::chamEC ec;
@@ -103,7 +106,7 @@ void GEMeMap::convertDummy(GEMROMapping& romap) {
 
           uint16_t chipPos = 0;
           for (int lphi = 0; lphi < maxVFat; ++lphi) {
-            for (int roll = 1; roll <= maxEtaPartition_; ++roll) {
+            for (int roll = 1; roll <= GEMDetId::maxRollId; ++roll) {
               GEMROMapping::vfatEC vec;
               vec.vfatAdd = chipPos;
               vec.detId = gemId;

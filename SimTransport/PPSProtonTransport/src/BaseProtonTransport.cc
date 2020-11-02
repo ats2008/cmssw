@@ -36,7 +36,7 @@ void BaseProtonTransport::ApplyBeamCorrection(TLorentzVector& p_out) {
     theta = TMath::Pi() - theta;
 
   if (MODE == TransportMode::TOTEM)
-    thetax += (p_out.Pz() > 0) ? fCrossingAngle_45 * urad : fCrossingAngle_56 * urad;
+    thetax += (p_out.Pz() > 0) ? fCrossingAngleX_45 * urad : fCrossingAngleX_56 * urad;
 
   double dtheta_x = (double)CLHEP::RandGauss::shoot(engine_, 0., m_sigmaSTX);
   double dtheta_y = (double)CLHEP::RandGauss::shoot(engine_, 0., m_sigmaSTY);
@@ -52,7 +52,7 @@ void BaseProtonTransport::ApplyBeamCorrection(TLorentzVector& p_out) {
   p_out.SetPz((double)p * (cos(s_theta)) * direction);
   p_out.SetE(energy);
 }
-void BaseProtonTransport::addPartToHepMC(HepMC::GenEvent* evt) {
+void BaseProtonTransport::addPartToHepMC(const HepMC::GenEvent* in_evt, HepMC::GenEvent* evt) {
   NEvent++;
   m_CorrespondenceMap.clear();
 
@@ -63,7 +63,7 @@ void BaseProtonTransport::addPartToHepMC(HepMC::GenEvent* evt) {
 
   for (auto const& it : m_beamPart) {
     line = (it).first;
-    gpart = evt->barcode_to_particle(line);
+    gpart = in_evt->barcode_to_particle(line);
 
     direction = (gpart->momentum().pz() > 0) ? 1 : -1;
 
@@ -92,13 +92,11 @@ void BaseProtonTransport::addPartToHepMC(HepMC::GenEvent* evt) {
                                                                     ddd * direction * m_to_mm,
                                                                     time + time * 0.001));
 
-    gpart->set_status(2);
-    vert->add_particle_in(gpart);
     vert->add_particle_out(new HepMC::GenParticle(
         HepMC::FourVector(p_out.Px(), p_out.Py(), p_out.Pz(), p_out.E()), gpart->pdg_id(), 1, gpart->flow()));
     evt->add_vertex(vert);
 
-    int ingoing = (*vert->particles_in_const_begin())->barcode();
+    int ingoing = 0;  //do not attach the incoming proton to this vertex to avoid duplicating data
     int outgoing = (*vert->particles_out_const_begin())->barcode();
 
     LHCTransportLink theLink(ingoing, outgoing);

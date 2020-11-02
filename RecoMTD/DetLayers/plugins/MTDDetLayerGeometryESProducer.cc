@@ -36,14 +36,13 @@ public:
   static void fillDescriptions(edm::ConfigurationDescriptions&);
 
 private:
-  edm::ESGetToken<MTDGeometry, MTDDigiGeometryRecord> geomToken_;
+  const edm::ESGetToken<MTDGeometry, MTDDigiGeometryRecord> geomToken_;
 };
 
 using namespace edm;
 
-MTDDetLayerGeometryESProducer::MTDDetLayerGeometryESProducer(const edm::ParameterSet& p) {
-  setWhatProduced(this).setConsumes(geomToken_);
-}
+MTDDetLayerGeometryESProducer::MTDDetLayerGeometryESProducer(const edm::ParameterSet& p)
+    : geomToken_(setWhatProduced(this).consumes()) {}
 
 std::unique_ptr<MTDDetLayerGeometry> MTDDetLayerGeometryESProducer::produce(const MTDRecoGeometryRecord& record) {
   auto mtdDetLayerGeometry = std::make_unique<MTDDetLayerGeometry>();
@@ -54,8 +53,7 @@ std::unique_ptr<MTDDetLayerGeometry> MTDDetLayerGeometryESProducer::produce(cons
     // Build ETL layers
     mtdDetLayerGeometry->addETLLayers(ETLDetLayerGeometryBuilder::buildLayers(*mtd));
   } else {
-    const std::string metname = "MTD|RecoMTD|RecoMTDDetLayers|MTDDetLayerGeometryESProducer";
-    LogInfo(metname) << "No MTD geometry is available.";
+    LogWarning("MTDDetLayers") << "No MTD geometry is available.";
   }
 
   // Sort layers properly

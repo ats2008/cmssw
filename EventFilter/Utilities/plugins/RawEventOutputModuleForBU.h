@@ -18,9 +18,9 @@
 #include "FWCore/Utilities/interface/Adler32Calculator.h"
 #include "EventFilter/Utilities/interface/crc32c.h"
 
-#include "boost/shared_array.hpp"
+#include <memory>
+#include <vector>
 
-class FRDEventMsgView;
 template <class Consumer>
 class RawEventOutputModuleForBU : public edm::one::OutputModule<edm::one::WatchRuns, edm::one::WatchLuminosityBlocks> {
   typedef unsigned int uint32;
@@ -69,7 +69,7 @@ RawEventOutputModuleForBU<Consumer>::RawEventOutputModuleForBU(edm::ParameterSet
       instance_(ps.getUntrackedParameter<std::string>("ProductInstance", "")),
       token_(consumes<FEDRawDataCollection>(edm::InputTag(label_, instance_))),
       numEventsPerFile_(ps.getUntrackedParameter<unsigned int>("numEventsPerFile", 100)),
-      frdVersion_(ps.getUntrackedParameter<unsigned int>("frdVersion", 3)),
+      frdVersion_(ps.getUntrackedParameter<unsigned int>("frdVersion", 6)),
       totsize(0LL),
       writtensize(0LL),
       writtenSizeLast(0LL),
@@ -107,9 +107,19 @@ void RawEventOutputModuleForBU<Consumer>::write(edm::EventForOutput const& e) {
 
   totsize += expectedSize;
   // build the FRDEvent into a temporary buffer
-  boost::shared_array<unsigned char> workBuffer(new unsigned char[expectedSize + 256]);
-  uint32* bufPtr = (uint32*)workBuffer.get();
-  *bufPtr++ = (uint32)frdVersion_;  // version number
+  std::unique_ptr<std::vector<unsigned char>> workBuffer(
+      std::make_unique<std::vector<unsigned char>>(expectedSize + 256));
+  uint32* bufPtr = (uint32*)(workBuffer.get()->data());
+  if (frdVersion_ <= 5) {
+    *bufPtr++ = (uint32)frdVersion_;  // version number only
+  } else {
+    uint16 flags = 0;
+    if (!e.eventAuxiliary().isRealData())
+      flags |= FRDEVENT_MASK_ISGENDATA;
+    *(uint16*)bufPtr = (uint16)(frdVersion_ & 0xffff);
+    *((uint16*)bufPtr + 1) = flags;
+    bufPtr++;
+  }
   *bufPtr++ = (uint32)e.id().run();
   *bufPtr++ = (uint32)e.luminosityBlock();
   *bufPtr++ = (uint32)e.id().event();
@@ -152,12 +162,10 @@ void RawEventOutputModuleForBU<Consumer>::write(edm::EventForOutput const& e) {
   }
 
   // create the FRDEventMsgView and use the template consumer to write it out
-  FRDEventMsgView msg(workBuffer.get());
+  FRDEventMsgView msg(workBuffer.get()->data());
   writtensize += msg.size();
 
-  if (templateConsumer_->sharedMode())
-    templateConsumer_->doOutputEvent(workBuffer);
-  else
+  if (!templateConsumer_->sharedMode())
     templateConsumer_->doOutputEvent(msg);
 }
 

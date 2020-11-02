@@ -223,8 +223,27 @@ namespace edm {
             [&]() { hold = proxy->get(*this, key, iTransientAccessOnly, activityRegistry_, iEventSetupImpl); });
       } catch (cms::Exception& e) {
         addTraceInfoToCmsException(e, key.name().value(), proxy->providerDescription(), key);
-        //NOTE: the above function can't do the 'throw' since it causes the C++ class type
-        // of the throw to be changed, a 'rethrow' does not have that problem
+        throw;
+      }
+      return hold;
+    }
+
+    void const* EventSetupRecordImpl::getFromProxyAfterPrefetch(ESProxyIndex iProxyIndex,
+                                                                bool iTransientAccessOnly,
+                                                                ComponentDescription const*& iDesc,
+                                                                DataKey const*& oGottenKey) const {
+      const DataProxy* proxy = proxies_[iProxyIndex.value()];
+      assert(nullptr != proxy);
+      iDesc = proxy->providerDescription();
+
+      auto const& key = keysForProxies_[iProxyIndex.value()];
+      oGottenKey = &key;
+
+      void const* hold = nullptr;
+      try {
+        convertException::wrap([&]() { hold = proxy->getAfterPrefetch(*this, key, iTransientAccessOnly); });
+      } catch (cms::Exception& e) {
+        addTraceInfoToCmsException(e, key.name().value(), proxy->providerDescription(), key);
         throw;
       }
       return hold;
@@ -238,22 +257,19 @@ namespace edm {
       return proxies_[std::distance(keysForProxies_.begin(), lb)].get();
     }
 
-    bool EventSetupRecordImpl::doGet(const DataKey& aKey,
-                                     EventSetupImpl const* iEventSetupImpl,
-                                     bool aGetTransiently) const {
-      const DataProxy* proxy = find(aKey);
-      if (nullptr != proxy) {
-        try {
-          convertException::wrap(
-              [&]() { proxy->doGet(*this, aKey, aGetTransiently, activityRegistry_, iEventSetupImpl); });
-        } catch (cms::Exception& e) {
-          addTraceInfoToCmsException(e, aKey.name().value(), proxy->providerDescription(), aKey);
-          //NOTE: the above function can't do the 'throw' since it causes the C++ class type
-          // of the throw to be changed, a 'rethrow' does not have that problem
-          throw;
-        }
+    void EventSetupRecordImpl::prefetchAsync(WaitingTask* iTask,
+                                             ESProxyIndex iProxyIndex,
+                                             EventSetupImpl const* iEventSetupImpl,
+                                             ServiceToken const& iToken) const {
+      if UNLIKELY (iProxyIndex.value() == std::numeric_limits<int>::max()) {
+        return;
       }
-      return nullptr != proxy;
+
+      const DataProxy* proxy = proxies_[iProxyIndex.value()];
+      if (nullptr != proxy) {
+        auto const& key = keysForProxies_[iProxyIndex.value()];
+        proxy->prefetchAsync(iTask, *this, key, iEventSetupImpl, iToken);
+      }
     }
 
     bool EventSetupRecordImpl::wasGotten(const DataKey& aKey) const {

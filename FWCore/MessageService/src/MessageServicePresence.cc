@@ -17,10 +17,10 @@
 //
 //
 
-#include "FWCore/MessageService/interface/MainThreadMLscribe.h"
+#include "FWCore/MessageService/src/MainThreadMLscribe.h"
 #include "FWCore/MessageService/interface/MessageServicePresence.h"
-#include "FWCore/MessageService/interface/MessageLoggerScribe.h"
-#include "FWCore/MessageService/interface/ThreadQueue.h"
+#include "FWCore/MessageService/src/MessageLoggerScribe.h"
+#include "FWCore/MessageService/src/ThreadQueue.h"
 
 #include "FWCore/MessageLogger/interface/MessageLoggerQ.h"
 #include "FWCore/Utilities/interface/UnixSignalHandlers.h"
@@ -52,7 +52,7 @@ namespace edm {
                           // start a new thread, run rMLS(m_queue)
                           // ChangeLog 2
                           ))
-    // Note that m_scribeThread, which is a boost::thread, has a single-argument ctor -
+    // Note that m_scribeThread, which is a std::thread, has a single-argument ctor -
     // just the function to be run.  But we need to do something first, namely,
     // ensure that the MessageLoggerQ is in a valid state - and that requires
     // a statement.  So we bundle that statement in parenthesis, separated by

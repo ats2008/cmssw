@@ -80,7 +80,8 @@
   <class name="l1t::TauVectorRef"/>
   <class name="edm::Wrapper<l1t::TauVectorRef>"/>
 
-  <class name="l1t::Muon" ClassVersion="17">
+  <class name="l1t::Muon" ClassVersion="18">
+   <version ClassVersion="18" checksum="2723313197"/>
    <version ClassVersion="17" checksum="3946815604"/>
    <version ClassVersion="16" checksum="1302394108"/>
    <version ClassVersion="15" checksum="957467775"/>
@@ -90,6 +91,7 @@
    <version ClassVersion="11" checksum="2449295419"/>
    <version ClassVersion="10" checksum="1956355507"/>
   </class>
+  <class name="edm::Ptr<l1t::Muon>"/>
   <class name="l1t::MuonBxCollection"/>
   <class name="std::vector<l1t::Muon>"/>
   <class name="edm::Wrapper<l1t::MuonBxCollection>"/>
@@ -261,4 +263,5 @@
   <class name="std::vector<l1t::L1DataEmulResult>"/>
   <class name="edm::Wrapper<l1t::L1DataEmulResultBxCollection>"/>
 
+  <class name="edm::Ptr<l1t::L1Candidate>"/>
 </lcgdict>
