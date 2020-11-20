@@ -37,6 +37,8 @@ namespace gpuDAVertexer{
         DAVertexer( float zSplit): zSplit_(zSplit)       {}
             
         ZVertexHeterogeneous makeAsync(cudaStream_t stream,TkSoA const * tks);
+        
+        float get_splitSeparation() { return zSplit_ ;}
 
     private:
         float zSplit_;
