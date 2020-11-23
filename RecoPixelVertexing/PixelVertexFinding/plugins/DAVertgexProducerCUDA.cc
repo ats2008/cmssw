@@ -74,6 +74,7 @@ void DAVertgexProducerCUDA::produce(edm::Event& iEvent, const edm::EventSetup& i
 
     assert(tracks);
     std::cout<<" Going to the GPU DA !! with splitSeparation =  "<<m_daVertexer.get_splitSeparation()<<std::endl; 
+    
     ctx.emplace(iEvent, tockenGPUdaVertex_,m_daVertexer.makeAsync(ctx.stream(),tracks));
 
 }

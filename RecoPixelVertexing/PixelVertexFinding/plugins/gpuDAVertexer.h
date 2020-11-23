@@ -9,7 +9,6 @@ namespace gpuDAVertexer{
     using TkSoA = pixelTrack::TrackSoA;
 
     struct Workspace{
-
     static constexpr uint32_t MAXTRACKS = ZVertexSoA::MAXTRACKS;
     static constexpr uint32_t MAXVTX = ZVertexSoA::MAXTRACKS;
 
@@ -42,8 +41,6 @@ namespace gpuDAVertexer{
 
     private:
         float zSplit_;
-     
-    
 
    };
 }

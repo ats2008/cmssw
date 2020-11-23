@@ -31,6 +31,8 @@ namespace gpuDAVertexer{
 
 }
 
+
+
 ZVertexHeterogeneous DAVertexer::makeAsync(cudaStream_t stream,const pixelTrack::TrackSoA* tracks )
 {
    auto wSpace_ =  cms::cuda::make_device_unique<Workspace>(stream);
