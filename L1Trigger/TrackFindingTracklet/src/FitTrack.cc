@@ -277,7 +277,7 @@ void FitTrack::trackFitChisq(Tracklet* tracklet, std::vector<const Stub*>&, std:
       }
     }
 
-    for (unsigned int d1 = 1; d1 <= N_DISK; d1++) {
+    for (int d1 = 1; d1 <= N_DISK; d1++) {
       int d = d1;
 
       // skip F/B5 if there's already a L2 match
@@ -286,7 +286,7 @@ void FitTrack::trackFitChisq(Tracklet* tracklet, std::vector<const Stub*>&, std:
 
       if (tracklet->fpgat().value() < 0.0)
         d = -d1;
-      if (d == tracklet->disk() || d == tracklet->disk2()) {
+      if (d1 == abs(tracklet->disk()) || d1 == abs(tracklet->disk()) + 1) {
         dmatches.set(2 * d1 - 1);
         diskmask |= (1 << (2 * (N_DISK - d1) + 1));
         alpha[ndisks] = 0.0;
@@ -826,7 +826,7 @@ std::vector<Tracklet*> FitTrack::orderedMatches(vector<FullMatchMemory*>& fullma
 
   int bestIndex = -1;
   do {
-    int bestTCID = (1 << 16);
+    int bestTCID = -1;
     bestIndex = -1;
     for (unsigned int i = 0; i < fullmatch.size(); i++) {
       if (indexArray[i] >= fullmatch[i]->nMatches()) {
@@ -834,7 +834,7 @@ std::vector<Tracklet*> FitTrack::orderedMatches(vector<FullMatchMemory*>& fullma
         continue;
       }
       int TCID = fullmatch[i]->getTracklet(indexArray[i])->TCID();
-      if (TCID < bestTCID) {
+      if (TCID < bestTCID || bestTCID < 0) {
         bestTCID = TCID;
         bestIndex = i;
       }
@@ -933,55 +933,48 @@ void FitTrack::execute() {
     int nMatchesUniq = 0;
     bool match = false;
 
-    if (indexArray[0] < matches1.size()) {
-      while (matches1[indexArray[0]] == bestTracklet && indexArray[0] < matches1.size()) {
-        indexArray[0]++;
-        nMatches++;
-        match = true;
-      }
+    while (indexArray[0] < matches1.size() && matches1[indexArray[0]] == bestTracklet) {
+      indexArray[0]++;
+      nMatches++;
+      match = true;
     }
 
     if (match)
       nMatchesUniq++;
     match = false;
 
-    if (indexArray[1] < matches2.size()) {
-      while (matches2[indexArray[1]] == bestTracklet && indexArray[1] < matches2.size()) {
-        indexArray[1]++;
-        nMatches++;
-        match = true;
-      }
+    while (indexArray[1] < matches2.size() && matches2[indexArray[1]] == bestTracklet) {
+      indexArray[1]++;
+      nMatches++;
+      match = true;
     }
 
     if (match)
       nMatchesUniq++;
     match = false;
 
-    if (indexArray[2] < matches3.size()) {
-      while (matches3[indexArray[2]] == bestTracklet && indexArray[2] < matches3.size()) {
-        indexArray[2]++;
-        nMatches++;
-        match = true;
-      }
+    while (indexArray[2] < matches3.size() && matches3[indexArray[2]] == bestTracklet) {
+      indexArray[2]++;
+      nMatches++;
+      match = true;
     }
 
     if (match)
       nMatchesUniq++;
     match = false;
 
-    if (indexArray[3] < matches4.size()) {
-      while (matches4[indexArray[3]] == bestTracklet && indexArray[3] < matches4.size()) {
-        indexArray[3]++;
-        nMatches++;
-        match = true;
-      }
+    while (indexArray[3] < matches4.size() && matches4[indexArray[3]] == bestTracklet) {
+      indexArray[3]++;
+      nMatches++;
+      match = true;
     }
 
     if (match)
       nMatchesUniq++;
 
     if (settings_.debugTracklet()) {
-      edm::LogVerbatim("Tracklet") << getName() << " : nMatches = " << nMatches << " " << asinh(bestTracklet->t());
+      edm::LogVerbatim("Tracklet") << getName() << " : nMatches = " << nMatches << " nMatchesUniq = " << nMatchesUniq
+                                   << " " << asinh(bestTracklet->t());
     }
 
     std::vector<const Stub*> trackstublist;

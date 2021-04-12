@@ -9,7 +9,7 @@
 #include "FWCore/PluginManager/interface/ModuleDef.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
 //
-#include "FWCore/Framework/interface/stream/EDProducer.h"
+#include "FWCore/Framework/interface/one/EDProducer.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/Framework/interface/EventSetup.h"
@@ -93,6 +93,7 @@
 #include "DataFormats/GeometrySurface/interface/BoundPlane.h"
 
 #include "L1Trigger/TrackTrigger/interface/StubPtConsistency.h"
+#include "L1Trigger/TrackTrigger/interface/TrackQuality.h"
 
 //////////////
 // STD HEADERS
@@ -129,7 +130,7 @@ public:
   }
 };
 
-class L1FPGATrackProducer : public edm::stream::EDProducer<> {
+class L1FPGATrackProducer : public edm::one::EDProducer<edm::one::WatchRuns> {
 public:
   /// Constructor/destructor
   explicit L1FPGATrackProducer(const edm::ParameterSet& iConfig);
@@ -151,8 +152,10 @@ private:
 
   edm::FileInPath DTCLinkFile;
   edm::FileInPath moduleCablingFile;
-
   edm::FileInPath DTCLinkLayerDiskFile;
+
+  edm::FileInPath tableTEDFile;
+  edm::FileInPath tableTREFile;
 
   string asciiEventOutName_;
   std::ofstream asciiEventOut_;
@@ -167,6 +170,9 @@ private:
 
   unsigned int nHelixPar_;
   bool extended_;
+
+  bool trackQuality_;
+  std::unique_ptr<TrackQuality> trackQualityModel_;
 
   std::map<string, vector<int>> dtclayerdisk;
 
@@ -191,6 +197,7 @@ private:
   /// ///////////////// ///
   /// MANDATORY METHODS ///
   void beginRun(const edm::Run& run, const edm::EventSetup& iSetup) override;
+  void endRun(edm::Run const&, edm::EventSetup const&) override;
   void produce(edm::Event& iEvent, const edm::EventSetup& iSetup) override;
 };
 
@@ -230,11 +237,15 @@ L1FPGATrackProducer::L1FPGATrackProducer(edm::ParameterSet const& iConfig)
 
   DTCLinkFile = iConfig.getParameter<edm::FileInPath>("DTCLinkFile");
   moduleCablingFile = iConfig.getParameter<edm::FileInPath>("moduleCablingFile");
-
   DTCLinkLayerDiskFile = iConfig.getParameter<edm::FileInPath>("DTCLinkLayerDiskFile");
 
   extended_ = iConfig.getParameter<bool>("Extended");
   nHelixPar_ = iConfig.getParameter<unsigned int>("Hnpar");
+
+  if (extended_) {
+    tableTEDFile = iConfig.getParameter<edm::FileInPath>("tableTEDFile");
+    tableTREFile = iConfig.getParameter<edm::FileInPath>("tableTREFile");
+  }
 
   // --------------------------------------------------------------------------------
   // set options in Settings based on inputs from configuration files
@@ -251,6 +262,16 @@ L1FPGATrackProducer::L1FPGATrackProducer(edm::ParameterSet const& iConfig)
   settings.setMemoryModulesFile(memoryModulesFile.fullPath());
   settings.setWiresFile(wiresFile.fullPath());
 
+  if (extended_) {
+    settings.setTableTEDFile(tableTEDFile.fullPath());
+    settings.setTableTREFile(tableTREFile.fullPath());
+
+    //FIXME: The TED and TRE tables are currently disabled by default, so we
+    //need to allow for the additional tracklets that will eventually be
+    //removed by these tables, once they are finalized
+    settings.setNbitstrackletindex(10);
+  }
+
   eventnum = 0;
   if (not asciiEventOutName_.empty()) {
     asciiEventOut_.open(asciiEventOutName_.c_str());
@@ -264,6 +285,15 @@ L1FPGATrackProducer::L1FPGATrackProducer(edm::ParameterSet const& iConfig)
                                  << "\n process modules : " << processingModulesFile.fullPath()
                                  << "\n memory modules :  " << memoryModulesFile.fullPath()
                                  << "\n wires          :  " << wiresFile.fullPath();
+    if (extended_) {
+      edm::LogVerbatim("Tracklet") << "table_TED    :  " << tableTEDFile.fullPath()
+                                   << "\n table_TRE    :  " << tableTREFile.fullPath();
+    }
+  }
+
+  trackQuality_ = iConfig.getParameter<bool>("TrackQuality");
+  if (trackQuality_) {
+    trackQualityModel_ = std::make_unique<TrackQuality>(iConfig.getParameter<edm::ParameterSet>("TrackQualityPSet"));
   }
 }
 
@@ -274,6 +304,10 @@ L1FPGATrackProducer::~L1FPGATrackProducer() {
     asciiEventOut_.close();
   }
 }
+
+///////END RUN
+//
+void L1FPGATrackProducer::endRun(const edm::Run& run, const edm::EventSetup& iSetup) {}
 
 ////////////
 // BEGIN JOB
@@ -287,7 +321,7 @@ void L1FPGATrackProducer::beginRun(const edm::Run& run, const edm::EventSetup& i
   settings.setBfield(mMagneticFieldStrength);
 
   // initialize the tracklet event processing (this sets all the processing & memory modules, wiring, etc)
-  eventProcessor.init(&settings);
+  eventProcessor.init(settings);
 }
 
 //////////
@@ -554,7 +588,7 @@ void L1FPGATrackProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSe
       LocalPoint clustlp_outer = topol_outer->localPosition(coords_outer);
       GlobalPoint posStub_outer = theGeomDet_outer->surface().toGlobal(clustlp_outer);
 
-      bool isFlipped = !(posStub_outer.mag() < posStub_inner.mag());
+      bool isFlipped = (posStub_outer.mag() < posStub_inner.mag());
 
       // -----------------------------------------------------
       // correct sign for stubs in negative endcap
@@ -663,6 +697,10 @@ void L1FPGATrackProducer::produce(edm::Event& iEvent, const edm::EventSetup& iSe
 
     // set TTTrack word
     aTrack.setTrackWordBits();
+
+    if (trackQuality_) {
+      trackQualityModel_->setTrackQuality(aTrack);
+    }
 
     // test track word
     //aTrack.testTrackWordBits();

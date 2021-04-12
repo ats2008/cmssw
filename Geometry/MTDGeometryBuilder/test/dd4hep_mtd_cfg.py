@@ -14,12 +14,56 @@ process.maxEvents = cms.untracked.PSet(
     input = cms.untracked.int32(1)
 )
 
-process.load("FWCore.MessageLogger.MessageLogger_cfi")
-process.MessageLogger.cerr.INFO.limit = -1
-
+process.MessageLogger = cms.Service("MessageLogger",
+    cerr = cms.untracked.PSet(
+        enable = cms.untracked.bool(False)
+    ),
+    cout = cms.untracked.PSet(
+        FWKINFO = cms.untracked.PSet(
+            limit = cms.untracked.int32(0)
+        ),
+        INFO = cms.untracked.PSet(
+            limit = cms.untracked.int32(0)
+        ),
+        MTDDigiGeometryAnalyzer = cms.untracked.PSet(
+            limit = cms.untracked.int32(-1)
+        ),
+        DD4hep_TestBTLPixelTopology = cms.untracked.PSet(
+            limit = cms.untracked.int32(-1)
+        ),
+        enable = cms.untracked.bool(True),
+        enableStatistics = cms.untracked.bool(True),
+        noLineBreaks = cms.untracked.bool(True),
+        threshold = cms.untracked.string('INFO')
+    ),
+    files = cms.untracked.PSet(
+        mtdGeometryDD4hep = cms.untracked.PSet(
+            DEBUG = cms.untracked.PSet(
+                limit = cms.untracked.int32(0)
+            ),
+            ERROR = cms.untracked.PSet(
+                limit = cms.untracked.int32(0)
+            ),
+            FWKINFO = cms.untracked.PSet(
+                limit = cms.untracked.int32(0)
+            ),
+            INFO = cms.untracked.PSet(
+                limit = cms.untracked.int32(0)
+            ),
+            MTDUnitTest = cms.untracked.PSet(
+                limit = cms.untracked.int32(-1)
+            ),
+            WARNING = cms.untracked.PSet(
+                limit = cms.untracked.int32(0)
+            ),
+            noLineBreaks = cms.untracked.bool(True),
+            threshold = cms.untracked.string('INFO')
+        )
+    )
+)
 
 process.DDDetectorESProducer = cms.ESSource("DDDetectorESProducer",
-                                            confGeomXMLFiles = cms.FileInPath('Geometry/MTDCommonData/data/dd4hep/cms-mtdD50-geometry.xml'),
+                                            confGeomXMLFiles = cms.FileInPath('Geometry/MTDCommonData/data/dd4hep/cms-mtdD76-geometry.xml'),
                                             appendToDataLabel = cms.string('')
 )
 
@@ -42,5 +86,8 @@ process.mtdGeometry.applyAlignment = cms.bool(False)
 process.Timing = cms.Service("Timing")
 
 process.prod = cms.EDAnalyzer("MTDDigiGeometryAnalyzer")
+process.prod1 = cms.EDAnalyzer("DD4hep_TestBTLPixelTopology",
+    DDDetector = cms.ESInputTag('',''),
+)
 
-process.p1 = cms.Path(process.prod)
+process.p1 = cms.Path(process.prod+process.prod1)

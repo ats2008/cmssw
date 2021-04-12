@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "CondCore/CondDB/interface/IOVProxy.h"
 #include "SessionImpl.h"
 
@@ -75,11 +77,11 @@ namespace cond {
     IOVArray::IOVArray() : m_array(new IOVContainer) {}
 
     IOVArray::IOVArray(const IOVArray& rhs) : m_array(), m_tagInfo(rhs.m_tagInfo) {
-      m_array.reset(new IOVContainer(*rhs.m_array));
+      m_array = std::make_unique<IOVContainer>(*rhs.m_array);
     }
 
     IOVArray& IOVArray::operator=(const IOVArray& rhs) {
-      m_array.reset(new IOVContainer(*rhs.m_array));
+      m_array = std::make_unique<IOVContainer>(*rhs.m_array);
       m_tagInfo = rhs.m_tagInfo;
       return *this;
     }
@@ -142,12 +144,14 @@ namespace cond {
 
       checkTransaction("IOVProxyNew::load");
 
+      int dummy;
       if (!m_session->iovSchema().tagTable().select(tagName,
                                                     m_data->tagInfo.timeType,
                                                     m_data->tagInfo.payloadType,
                                                     m_data->tagInfo.synchronizationType,
                                                     m_data->tagInfo.endOfValidity,
-                                                    m_data->tagInfo.lastValidatedTime)) {
+                                                    m_data->tagInfo.lastValidatedTime,
+                                                    dummy)) {
         throwException("Tag \"" + tagName + "\" has not been found in the database.", "IOVProxy::load");
       }
       m_data->tagInfo.name = tagName;

@@ -67,7 +67,8 @@ void PurgeDuplicate::addInput(MemoryBase* memory, std::string input) {
                                   "trackin8",
                                   "trackin9",
                                   "trackin10",
-                                  "trackin11"};
+                                  "trackin11",
+                                  "trackin12"};
   if (inputs.find(input) != inputs.end()) {
     auto* tmp = dynamic_cast<TrackFitMemory*>(memory);
     assert(tmp != nullptr);
@@ -240,7 +241,7 @@ void PurgeDuplicate::execute(std::vector<Track*>& outputtracks_) {
             int i = stubsTrk2[stcount].first;
             int reg = (i > 0 && i < 10) * (i - 1) + (i > 10) * (i - 5) - (i < 0) * i;
             double nres = getPhiRes(inputtracklets_[jtrk], fullStubslistsTrk2[stcount]);
-            double ores;
+            double ores = 0;
             if (URStubidsTrk2[reg] != -1)
               ores = getPhiRes(inputtracklets_[jtrk], fullStubslistsTrk2[URStubidsTrk2[reg]]);
             if (URStubidsTrk2[reg] == -1 || nres < ores) {

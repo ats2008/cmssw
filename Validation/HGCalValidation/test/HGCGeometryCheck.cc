@@ -40,16 +40,18 @@ public:
   static void fillDescriptions(edm::ConfigurationDescriptions &descriptions);
 
 protected:
-  virtual void beginJob() override;
-  virtual void beginRun(edm::Run const &, edm::EventSetup const &) override;
-  virtual void analyze(edm::Event const &, edm::EventSetup const &) override;
-  virtual void endRun(edm::Run const &, edm::EventSetup const &) override {}
+  void beginJob() override;
+  void beginRun(edm::Run const &, edm::EventSetup const &) override;
+  void analyze(edm::Event const &, edm::EventSetup const &) override;
+  void endRun(edm::Run const &, edm::EventSetup const &) override {}
   virtual void beginLuminosityBlock(edm::LuminosityBlock const &, edm::EventSetup const &) {}
   virtual void endLuminosityBlock(edm::LuminosityBlock const &, edm::EventSetup const &) {}
 
 private:
   edm::EDGetTokenT<PHGCalValidInfo> g4Token_;
   std::vector<std::string> geometrySource_;
+  edm::ESGetToken<HcalDDDSimConstants, HcalSimNumberingRecord> tok_hrndc_;
+  std::vector<edm::ESGetToken<HGCalDDDConstants, IdealGeometryRecord> > tok_hgcGeom_;
 
   //HGCal geometry scheme
   std::vector<const HGCalDDDConstants *> hgcGeometry_;
@@ -63,11 +65,20 @@ private:
   static constexpr double mmTocm_ = 0.1;
 };
 
-HGCGeometryCheck::HGCGeometryCheck(const edm::ParameterSet &cfg) : hcons_(0) {
+HGCGeometryCheck::HGCGeometryCheck(const edm::ParameterSet &cfg) : hcons_(nullptr) {
   usesResource(TFileService::kSharedResource);
 
   g4Token_ = consumes<PHGCalValidInfo>(cfg.getParameter<edm::InputTag>("g4Source"));
   geometrySource_ = cfg.getUntrackedParameter<std::vector<std::string> >("geometrySource");
+  tok_hrndc_ = esConsumes<HcalDDDSimConstants, HcalSimNumberingRecord, edm::Transition::BeginRun>();
+  for (const auto &name : geometrySource_) {
+    if (name == "HCAL")
+      tok_hgcGeom_.emplace_back(esConsumes<HGCalDDDConstants, IdealGeometryRecord, edm::Transition::BeginRun>(
+          edm::ESInputTag{"", "HGCalHEScintillatorSensitive"}));
+    else
+      tok_hgcGeom_.emplace_back(
+          esConsumes<HGCalDDDConstants, IdealGeometryRecord, edm::Transition::BeginRun>(edm::ESInputTag{"", name}));
+  }
 
   edm::LogVerbatim("HGCalValid") << "HGCGeometryCheck:: use information from "
                                  << cfg.getParameter<edm::InputTag>("g4Source") << " and " << geometrySource_.size()
@@ -77,7 +88,7 @@ HGCGeometryCheck::HGCGeometryCheck(const edm::ParameterSet &cfg) : hcons_(0) {
 }
 
 void HGCGeometryCheck::fillDescriptions(edm::ConfigurationDescriptions &descriptions) {
-  std::vector<std::string> names = {"HGCalEESensitive", "HGCalHESiliconSensitive", "Hcal"};
+  std::vector<std::string> names = {"HGCalEESensitive", "HGCalHESiliconSensitive", "HGCalHEScintillatorSensitive"};
   edm::ParameterSetDescription desc;
   desc.addUntracked<std::vector<std::string> >("geometrySource", names);
   desc.add<edm::InputTag>("g4Source", edm::InputTag("g4SimHits", "HGCalInfoLayer"));
@@ -106,18 +117,16 @@ void HGCGeometryCheck::beginRun(const edm::Run &, const edm::EventSetup &iSetup)
   //initiating hgc geometry
   for (size_t i = 0; i < geometrySource_.size(); i++) {
     if (geometrySource_[i].find("Hcal") != std::string::npos) {
-      edm::ESHandle<HcalDDDSimConstants> pHRNDC;
-      iSetup.get<HcalSimNumberingRecord>().get(pHRNDC);
+      edm::ESHandle<HcalDDDSimConstants> pHRNDC = iSetup.getHandle(tok_hrndc_);
       if (pHRNDC.isValid()) {
         hcons_ = &(*pHRNDC);
-        hgcGeometry_.push_back(0);
+        hgcGeometry_.push_back(nullptr);
         edm::LogVerbatim("HGCalValid") << "Initialize geometry for " << geometrySource_[i];
       } else {
         edm::LogWarning("HGCalValid") << "Cannot initiate HcalGeometry for " << geometrySource_[i];
       }
     } else {
-      edm::ESHandle<HGCalDDDConstants> hgcGeom;
-      iSetup.get<IdealGeometryRecord>().get(geometrySource_[i], hgcGeom);
+      edm::ESHandle<HGCalDDDConstants> hgcGeom = iSetup.getHandle(tok_hgcGeom_[i]);
       if (hgcGeom.isValid()) {
         hgcGeometry_.push_back(hgcGeom.product());
         edm::LogVerbatim("HGCalValid") << "Initialize geometry for " << geometrySource_[i];

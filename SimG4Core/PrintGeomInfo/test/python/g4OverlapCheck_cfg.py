@@ -1,13 +1,22 @@
-
 import FWCore.ParameterSet.Config as cms
 
-process = cms.Process("G4PrintGeometry")
-
+#from Configuration.Eras.Era_Run2_cff import Run2
+#process = cms.Process('SIM',Run2)
 #process.load('Configuration.Geometry.GeometryExtended2015_cff')
 #process.load('Configuration.Geometry.GeometryExtended2017_cff')
+
+from Configuration.Eras.Era_Run3_cff import Run3
+process = cms.Process('SIM',Run3)
 process.load('Configuration.Geometry.GeometryExtended2021_cff')
-#process.load('Configuration.Geometry.GeometryExtended2026D17_cff')
-#process.load('Configuration.Geometry.GeometryExtended2026D45_cff')
+
+#from Configuration.Eras.Era_Phase2C11_cff import Phase2C11
+#process = cms.Process('SIM',Phase2C11)
+#process.load('Configuration.Geometry.GeometryExtended2026D76_cff')
+
+process.load('FWCore.MessageService.MessageLogger_cfi')
+
+#if hasattr(process,'MessageLogger'):
+#    process.MessageLogger.HCalGeom=dict()
 
 from SimG4Core.PrintGeomInfo.g4TestGeometry_cfi import *
 process = checkOverlap(process)
@@ -25,7 +34,6 @@ process.g4SimHits.G4CheckOverlap.Depth      = cms.int32(-1)
 process.g4SimHits.G4CheckOverlap.RegionFlag = cms.bool(False)
 # list of names
 process.g4SimHits.G4CheckOverlap.NodeNames  = cms.vstring('OCMS')
-process.g4SimHits.G4CheckOverlap.Tolerance  = cms.double(1)
 # enable dump gdml file 
 process.g4SimHits.G4CheckOverlap.gdmlFlag   = cms.bool(False)
 # if defined a G4PhysicsVolume info is printed

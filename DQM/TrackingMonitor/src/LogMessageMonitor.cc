@@ -58,7 +58,6 @@
 #include "DataFormats/Common/interface/Handle.h"
 
 #include "FWCore/MessageLogger/interface/ELseverityLevel.h"
-#include "FWCore/MessageLogger/interface/ELstring.h"
 #include "FWCore/MessageLogger/interface/ErrorSummaryEntry.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
@@ -120,8 +119,6 @@ void LogMessageMonitor::analyze(const edm::Event& iEvent, const edm::EventSetup&
   // Check that errors is valid
   if (!errors.isValid())
     return;
-  // Compare severity level of error with ELseveritylevel instance el : "-e" should be the lowest error
-  edm::ELseverityLevel el("-e");
 
   // Find the total number of errors in iEvent
   if (errors->empty()) {

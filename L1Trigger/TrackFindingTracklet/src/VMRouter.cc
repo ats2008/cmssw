@@ -22,7 +22,7 @@ VMRouter::VMRouter(string name, Settings const& settings, Globals* global, unsig
   overlapbits_ = 7;
   nextrabits_ = overlapbits_ - (settings_.nbitsallstubs(layerdisk_) + settings_.nbitsvmme(layerdisk_));
 
-  vmrtable_.init(layerdisk_);
+  vmrtable_.init(layerdisk_, getName());
 
   nbitszfinebintable_ = settings_.vmrlutzbits(layerdisk_);
   nbitsrfinebintable_ = settings_.vmrlutrbits(layerdisk_);
@@ -222,13 +222,16 @@ void VMRouter::execute() {
         vmbin += 8;
       int rzfine = melut & 7;
 
-      VMStubME vmstub(
-          stub,
-          stub->iphivmFineBins(iphi.nbits() - (settings_.nbitsallstubs(layerdisk_) + settings_.nbitsvmme(layerdisk_)),
-                               settings_.nbitsvmme(layerdisk_)),
-          FPGAWord(rzfine, 3, true, __LINE__, __FILE__),
-          stub->bend(),
-          allStubIndex);
+      // pad disk PS bend word with a '0' in MSB so that all disk bends have 4 bits (for HLS compatibility)
+      int nbendbits = stub->bend().nbits();
+      if (layerdisk_ >= N_LAYER)
+        nbendbits = settings_.nbendbitsmedisk();
+
+      VMStubME vmstub(stub,
+                      stub->iphivmFineBins(settings_.nbitsallstubs(layerdisk_) + settings_.nbitsvmme(layerdisk_), 3),
+                      FPGAWord(rzfine, 3, true, __LINE__, __FILE__),
+                      FPGAWord(stub->bend().value(), nbendbits, true, __LINE__, __FILE__),
+                      allStubIndex);
 
       assert(vmstubsMEPHI_[ivmPlus] != nullptr);
       vmstubsMEPHI_[ivmPlus]->addStub(vmstub, vmbin);

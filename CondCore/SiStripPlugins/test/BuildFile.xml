@@ -2,8 +2,7 @@
 <use name="CondCore/Utilities"/>
 <use name="FWCore/PluginManager"/>
 <use name="CalibTracker/StandaloneTrackerTopology"/>
+<use name="roothistpainter"/>
+<use name="DQM/TrackerRemapper"/>
 <bin file="testSiStripPayloadInspector.cpp" name="testSiStripPayloadInspector">
-  <ifrelease name="_PY3_">
-    <flags SETENV="PYTHONHOME=$(PYTHON_BASE)"/>
-  </ifrelease>
 </bin>

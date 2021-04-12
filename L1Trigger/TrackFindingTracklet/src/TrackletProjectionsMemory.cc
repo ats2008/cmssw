@@ -1,18 +1,17 @@
 #include "L1Trigger/TrackFindingTracklet/interface/TrackletProjectionsMemory.h"
 #include "L1Trigger/TrackFindingTracklet/interface/Tracklet.h"
-#include <iomanip>
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include <iomanip>
+#include <filesystem>
 
 using namespace std;
 using namespace trklet;
 
 TrackletProjectionsMemory::TrackletProjectionsMemory(string name, Settings const& settings, unsigned int iSector)
     : MemoryBase(name, settings, iSector) {
-  if (settings_.extended()) {
-    initLayerDisk(14, layer_, disk_);
-  } else {
-    initLayerDisk(12, layer_, disk_);
-  }
+  size_t pos = find_nth(name, 0, "_", 1);
+  assert(pos != string::npos);
+  initLayerDisk(pos + 1, layer_, disk_);
 }
 
 void TrackletProjectionsMemory::addProj(Tracklet* tracklet) {
@@ -36,17 +35,24 @@ void TrackletProjectionsMemory::addProj(Tracklet* tracklet) {
 void TrackletProjectionsMemory::clean() { tracklets_.clear(); }
 
 void TrackletProjectionsMemory::writeTPROJ(bool first) {
+  const string dirTP = settings_.memPath() + "TrackletProjections/";
+  if (not std::filesystem::exists(dirTP)) {
+    int fail = system((string("mkdir -p ") + dirTP).c_str());
+    if (fail)
+      throw cms::Exception("BadDir") << __FILE__ << " " << __LINE__ << " could not create directory " << dirTP;
+  }
+
   std::ostringstream oss;
-  oss << "../data/MemPrints/TrackletProjections/TrackletProjections_" << getName() << "_" << std::setfill('0')
-      << std::setw(2) << (iSector_ + 1) << ".dat";
+  oss << dirTP << "TrackletProjections_" << getName() << "_" << std::setfill('0') << std::setw(2) << (iSector_ + 1)
+      << ".dat";
   auto const& fname = oss.str();
 
   if (first) {
     bx_ = 0;
     event_ = 1;
-    out_.open(fname.c_str());
+    out_.open(fname);
   } else
-    out_.open(fname.c_str(), std::ofstream::app);
+    out_.open(fname, std::ofstream::app);
 
   out_ << "BX = " << (bitset<3>)bx_ << " Event : " << event_ << endl;
 

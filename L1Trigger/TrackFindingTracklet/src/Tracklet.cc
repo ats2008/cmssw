@@ -6,6 +6,8 @@
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 #include "FWCore/Utilities/interface/Exception.h"
 
+#include <memory>
+
 #include <sstream>
 
 using namespace std;
@@ -209,8 +211,10 @@ std::string Tracklet::trackletparstr() {
     if (middleFPGAStub_) {
       str += middleFPGAStub_->stubindex().str() + "|";
     }
-    str += outerFPGAStub_->stubindex().str() + "|" + fpgapars_.rinv().str() + "|" + fpgapars_.phi0().str() + "|" +
-           fpgapars_.d0().str() + "|" + fpgapars_.z0().str() + "|" + fpgapars_.t().str();
+    str += outerFPGAStub_->stubindex().str() + "|" + fpgapars_.rinv().str() + "|" + fpgapars_.phi0().str() + "|";
+    if (middleFPGAStub_)
+      str += fpgapars_.d0().str() + "|";
+    str += fpgapars_.z0().str() + "|" + fpgapars_.t().str();
     return str;
   }
 }
@@ -270,7 +274,7 @@ std::string Tracklet::trackletprojstr(int layer) const {
   if (trackletIndex_ < 0 || trackletIndex_ > (int)settings_.ntrackletmax()) {
     throw cms::Exception("BadConfig") << __FILE__ << " " << __LINE__ << " trackletIndex_ = " << trackletIndex_;
   }
-  tmp.set(trackletIndex_, 7, true, __LINE__, __FILE__);
+  tmp.set(trackletIndex_, settings_.nbitstrackletindex(), true, __LINE__, __FILE__);
   FPGAWord tcid;
   if (settings_.extended()) {
     tcid.set(TCIndex_, 8, true, __LINE__, __FILE__);
@@ -290,7 +294,7 @@ std::string Tracklet::trackletprojstrD(int disk) const {
   if (trackletIndex_ < 0 || trackletIndex_ > (int)settings_.ntrackletmax()) {
     throw cms::Exception("BadConfig") << __FILE__ << " " << __LINE__ << " trackletIndex_ = " << trackletIndex_;
   }
-  tmp.set(trackletIndex_, 7, true, __LINE__, __FILE__);
+  tmp.set(trackletIndex_, settings_.nbitstrackletindex(), true, __LINE__, __FILE__);
   FPGAWord tcid;
   if (settings_.extended()) {
     tcid.set(TCIndex_, 8, true, __LINE__, __FILE__);
@@ -375,7 +379,7 @@ std::string Tracklet::fullmatchstr(int layer) {
   if (trackletIndex_ < 0 || trackletIndex_ > (int)settings_.ntrackletmax()) {
     throw cms::Exception("BadConfig") << __FILE__ << " " << __LINE__ << " trackletIndex_ = " << trackletIndex_;
   }
-  tmp.set(trackletIndex_, 7, true, __LINE__, __FILE__);
+  tmp.set(trackletIndex_, settings_.nbitstrackletindex(), true, __LINE__, __FILE__);
   FPGAWord tcid;
   if (settings_.extended()) {
     tcid.set(TCIndex_, 8, true, __LINE__, __FILE__);
@@ -394,7 +398,7 @@ std::string Tracklet::fullmatchdiskstr(int disk) {
   if (trackletIndex_ < 0 || trackletIndex_ > (int)settings_.ntrackletmax()) {
     throw cms::Exception("BadConfig") << __FILE__ << " " << __LINE__ << " trackletIndex_ = " << trackletIndex_;
   }
-  tmp.set(trackletIndex_, 7, true, __LINE__, __FILE__);
+  tmp.set(trackletIndex_, settings_.nbitstrackletindex(), true, __LINE__, __FILE__);
   FPGAWord tcid;
   if (settings_.extended()) {
     tcid.set(TCIndex_, 8, true, __LINE__, __FILE__);
@@ -637,7 +641,7 @@ void Tracklet::setFitPars(double rinvfit,
 
   hitpattern_ = hitpattern;
 
-  fpgatrack_.reset(new Track(makeTrack(l1stubs)));
+  fpgatrack_ = std::make_unique<Track>(makeTrack(l1stubs));
 }
 
 std::string Tracklet::trackfitstr() {
@@ -837,9 +841,9 @@ int Tracklet::disk2() const {
   return innerStub_->disk() - 1;
 }
 
-void Tracklet::setTrackletIndex(int index) {
+void Tracklet::setTrackletIndex(unsigned int index) {
   trackletIndex_ = index;
-  assert(index < 128);
+  assert(index <= settings_.ntrackletmax());
 }
 
 int Tracklet::getISeed() const {

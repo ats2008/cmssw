@@ -2,23 +2,22 @@
 #include "L1Trigger/TrackFindingTracklet/interface/Tracklet.h"
 #include "L1Trigger/TrackFindingTracklet/interface/Stub.h"
 #include "L1Trigger/TrackFindingTracklet/interface/L1TStub.h"
-#include <iomanip>
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include <iomanip>
+#include <filesystem>
 
 using namespace std;
 using namespace trklet;
 
 FullMatchMemory::FullMatchMemory(string name, Settings const& settings, unsigned int iSector)
     : MemoryBase(name, settings, iSector) {
-  if (settings_.extended()) {
-    initLayerDisk(10, layer_, disk_);
-  } else {
-    initLayerDisk(8, layer_, disk_);
-  }
+  size_t pos = find_nth(name, 0, "_", 1);
+  assert(pos != string::npos);
+  initLayerDisk(pos + 1, layer_, disk_);
 }
 
 void FullMatchMemory::addMatch(Tracklet* tracklet, const Stub* stub) {
-  if (!settings_.doKF()) {  //When using KF we allow multiple matches
+  if (!settings_.doKF() || !settings_.doMultipleMatches()) {  //When using KF we allow multiple matches
     for (auto& match : matches_) {
       if (match.first == tracklet) {  //Better match, replace
         match.second = stub;
@@ -41,17 +40,27 @@ void FullMatchMemory::addMatch(Tracklet* tracklet, const Stub* stub) {
 }
 
 void FullMatchMemory::writeMC(bool first) {
+  const string dirM = settings_.memPath() + "Matches/";
+
   std::ostringstream oss;
-  oss << "../data/MemPrints/Matches/FullMatches_" << getName() << "_" << std::setfill('0') << std::setw(2)
-      << (iSector_ + 1) << ".dat";
+  oss << dirM << "FullMatches_" << getName() << "_" << std::setfill('0') << std::setw(2) << (iSector_ + 1) << ".dat";
   auto const& fname = oss.str();
 
   if (first) {
     bx_ = 0;
     event_ = 1;
-    out_.open(fname.c_str());
+
+    if (not std::filesystem::exists(dirM)) {
+      int fail = system((string("mkdir -p ") + dirM).c_str());
+      if (fail)
+        throw cms::Exception("BadDir") << __FILE__ << " " << __LINE__ << " could not create directory " << dirM;
+    }
+    out_.open(fname);
+    if (out_.fail())
+      throw cms::Exception("BadFile") << __FILE__ << " " << __LINE__ << " could not create file " << fname;
+
   } else
-    out_.open(fname.c_str(), std::ofstream::app);
+    out_.open(fname, std::ofstream::app);
 
   out_ << "BX = " << (bitset<3>)bx_ << " Event : " << event_ << endl;
 

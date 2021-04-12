@@ -2,6 +2,7 @@
 
 #include <iomanip>
 #include <iostream>
+#include <memory>
 
 // Default values of configuration parameters.
 const unsigned int CSCCathodeLCTProcessor::def_fifo_tbins = 12;
@@ -57,9 +58,10 @@ CSCCathodeLCTProcessor::CSCCathodeLCTProcessor(unsigned endcap,
   // Verbosity level, set to 0 (no print) by default.
   infoV = clctParams_.getParameter<int>("verbosity");
 
-  use_run3_patterns_ = clctParams_.getParameter<bool>("useRun3Patterns");
-
-  use_comparator_codes_ = clctParams_.getParameter<bool>("useComparatorCodes");
+  // Do not exclude pattern 0 and 1 when the Run-3 patterns are enabled.
+  if (runCCLUT_) {
+    pid_thresh_pretrig = 0;
+  }
 
   // Check and print configuration parameters.
   checkConfigParameters();
@@ -68,7 +70,7 @@ CSCCathodeLCTProcessor::CSCCathodeLCTProcessor(unsigned endcap,
     config_dumped = true;
   }
 
-  numStrips = 0;  // Will be set later.
+  numStrips_ = 0;  // Will be set later.
   // Provisional, but should be OK for all stations except ME1.
   for (int i_layer = 0; i_layer < CSCConstants::NUM_LAYERS; i_layer++) {
     if ((i_layer + 1) % 2 == 0)
@@ -78,13 +80,28 @@ CSCCathodeLCTProcessor::CSCCathodeLCTProcessor(unsigned endcap,
   }
 
   // which patterns should we use?
-  if (use_run3_patterns_) {
+  if (runCCLUT_) {
     clct_pattern_ = CSCPatternBank::clct_pattern_run3_;
   } else {
     clct_pattern_ = CSCPatternBank::clct_pattern_legacy_;
   }
 
+  if (runCCLUT_) {
+    positionLUTFiles_ = conf.getParameter<std::vector<std::string>>("positionLUTFiles");
+    slopeLUTFiles_ = conf.getParameter<std::vector<std::string>>("slopeLUTFiles");
+    patternConversionLUTFiles_ = conf.getParameter<std::vector<std::string>>("patternConversionLUTFiles");
+
+    for (int i = 0; i < 5; ++i) {
+      lutpos_[i] = std::make_unique<CSCComparatorCodeLUT>(positionLUTFiles_[i]);
+      lutslope_[i] = std::make_unique<CSCComparatorCodeLUT>(slopeLUTFiles_[i]);
+      lutpatconv_[i] = std::make_unique<CSCComparatorCodeLUT>(patternConversionLUTFiles_[i]);
+    }
+  }
+
   thePreTriggerDigis.clear();
+
+  // quality control of stubs
+  qualityControl_ = std::make_unique<LCTQualityControl>(endcap, station, sector, subsector, chamber, conf);
 }
 
 CSCCathodeLCTProcessor::CSCCathodeLCTProcessor() : CSCBaseboard() {
@@ -106,7 +123,7 @@ CSCCathodeLCTProcessor::CSCCathodeLCTProcessor() : CSCBaseboard() {
     config_dumped = true;
   }
 
-  numStrips = CSCConstants::MAX_NUM_STRIPS;
+  numStrips_ = CSCConstants::MAX_NUM_STRIPS;
   // Should be OK for all stations except ME1.
   for (int i_layer = 0; i_layer < CSCConstants::NUM_LAYERS; i_layer++) {
     if ((i_layer + 1) % 2 == 0)
@@ -186,9 +203,8 @@ void CSCCathodeLCTProcessor::clear() {
   thePreTriggerDigis.clear();
   thePreTriggerBXs.clear();
   for (int bx = 0; bx < CSCConstants::MAX_CLCT_TBINS; bx++) {
-    for (int iCLCT = 0; iCLCT < CSCConstants::MAX_CLCTS_PER_PROCESSOR; iCLCT++) {
-      CLCTContainer_[bx][iCLCT].clear();
-    }
+    bestCLCT[bx].clear();
+    secondCLCT[bx].clear();
   }
 }
 
@@ -205,41 +221,43 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::run(const CSCComparatorDigiColl
 
   // Get the number of strips and stagger of layers for the given chamber.
   // Do it only once per chamber.
-  if (numStrips == 0) {
+  if (numStrips_ <= 0 or numStrips_ > CSCConstants::MAX_NUM_STRIPS_7CFEBS) {
     if (cscChamber_) {
-      numStrips = cscChamber_->layer(1)->geometry()->numberOfStrips();
+      numStrips_ = cscChamber_->layer(1)->geometry()->numberOfStrips();
+
       // ME1/a is known to the readout hardware as strips 65-80 of ME1/1.
       // Still need to decide whether we do any special adjustments to
       // reconstruct LCTs in this region (3:1 ganged strips); for now, we
       // simply allow for hits in ME1/a and apply standard reconstruction
       // to them.
-      // For SLHC ME1/1 is set to have 4 CFEBs in ME1/b and 3 CFEBs in ME1/a
+      // For Phase2 ME1/1 is set to have 4 CFEBs in ME1/b and 3 CFEBs in ME1/a
       if (isME11_) {
         if (theRing == 4) {
-          if (infoV >= 0) {
-            edm::LogError("L1CSCTPEmulatorSetupError")
-                << "+++ Invalid ring number for this processor " << theRing << " was set in the config."
-                << " +++\n"
-                << "+++ CSC geometry looks garbled; no emulation possible +++\n";
-          }
+          edm::LogError("CSCCathodeLCTProcessor|SetupError")
+              << "+++ Invalid ring number for this processor " << theRing << " was set in the config."
+              << " +++\n"
+              << "+++ CSC geometry looks garbled; no emulation possible +++\n";
         }
         if (!disableME1a_ && theRing == 1 && !gangedME1a_)
-          numStrips = CSCConstants::MAX_NUM_STRIPS_7CFEBS;
+          numStrips_ = CSCConstants::MAX_NUM_STRIPS_7CFEBS;
         if (!disableME1a_ && theRing == 1 && gangedME1a_)
-          numStrips = CSCConstants::MAX_NUM_STRIPS;
+          numStrips_ = CSCConstants::MAX_NUM_STRIPS;
         if (disableME1a_ && theRing == 1)
-          numStrips = CSCConstants::MAX_NUM_STRIPS_ME1B;
+          numStrips_ = CSCConstants::MAX_NUM_STRIPS_ME1B;
       }
 
-      if (numStrips > CSCConstants::MAX_NUM_STRIPS_7CFEBS) {
-        if (infoV >= 0)
-          edm::LogError("L1CSCTPEmulatorSetupError")
-              << "+++ Number of strips, " << numStrips << " found in "
-              << CSCDetId::chamberName(theEndcap, theStation, theRing, theChamber) << " (sector " << theSector
-              << " subsector " << theSubsector << " trig id. " << theTrigChamber << ")"
-              << " exceeds max expected, " << CSCConstants::MAX_NUM_STRIPS_7CFEBS << " +++\n"
-              << "+++ CSC geometry looks garbled; no emulation possible +++\n";
-        numStrips = -1;
+      numHalfStrips_ = 2 * numStrips_ + 1;
+      numCFEBs_ = numStrips_ / CSCConstants::NUM_STRIPS_PER_CFEB;
+
+      if (numStrips_ > CSCConstants::MAX_NUM_STRIPS_7CFEBS) {
+        edm::LogError("CSCCathodeLCTProcessor|SetupError")
+            << "+++ Number of strips, " << numStrips_ << " found in " << theCSCName_ << " (sector " << theSector
+            << " subsector " << theSubsector << " trig id. " << theTrigChamber << ")"
+            << " exceeds max expected, " << CSCConstants::MAX_NUM_STRIPS_7CFEBS << " +++\n"
+            << "+++ CSC geometry looks garbled; no emulation possible +++\n";
+        numStrips_ = -1;
+        numHalfStrips_ = -1;
+        numCFEBs_ = -1;
       }
       // The strips for a given layer may be offset from the adjacent layers.
       // This was done in order to improve resolution.  We need to find the
@@ -258,30 +276,30 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::run(const CSCComparatorDigiColl
         stagger[i_layer] = (cscChamber_->layer(i_layer + 1)->geometry()->stagger() + 1) / 2;
       }
     } else {
-      if (infoV >= 0)
-        edm::LogError("L1CSCTPEmulatorConfigError")
-            << " " << CSCDetId::chamberName(theEndcap, theStation, theRing, theChamber) << " (sector " << theSector
-            << " subsector " << theSubsector << " trig id. " << theTrigChamber << ")"
-            << " is not defined in current geometry! +++\n"
-            << "+++ CSC geometry looks garbled; no emulation possible +++\n";
-      numStrips = -1;
+      edm::LogError("CSCCathodeLCTProcessor|ConfigError")
+          << " " << theCSCName_ << " (sector " << theSector << " subsector " << theSubsector << " trig id. "
+          << theTrigChamber << ")"
+          << " is not defined in current geometry! +++\n"
+          << "+++ CSC geometry looks garbled; no emulation possible +++\n";
+      numStrips_ = -1;
+      numHalfStrips_ = -1;
+      numCFEBs_ = -1;
     }
   }
 
-  if (numStrips < 0) {
-    if (infoV >= 0)
-      edm::LogError("L1CSCTPEmulatorConfigError")
-          << " " << CSCDetId::chamberName(theEndcap, theStation, theRing, theChamber) << " (sector " << theSector
-          << " subsector " << theSubsector << " trig id. " << theTrigChamber << "):"
-          << " numStrips = " << numStrips << "; CLCT emulation skipped! +++";
+  if (numStrips_ <= 0 or 2 * (unsigned)numStrips_ > qualityControl_->get_csc_max_halfstrip(theStation, theRing)) {
+    edm::LogError("CSCCathodeLCTProcessor|ConfigError")
+        << " " << theCSCName_ << " (sector " << theSector << " subsector " << theSubsector << " trig id. "
+        << theTrigChamber << "):"
+        << " numStrips_ = " << numStrips_ << "; CLCT emulation skipped! +++";
     std::vector<CSCCLCTDigi> emptyV;
     return emptyV;
   }
 
   // Get comparator digis in this chamber.
-  bool noDigis = getDigis(compdc);
+  bool hasDigis = getDigis(compdc);
 
-  if (!noDigis) {
+  if (hasDigis) {
     // Get halfstrip times from comparator digis.
     std::vector<int> halfstrip[CSCConstants::NUM_LAYERS][CSCConstants::NUM_HALF_STRIPS_7CFEBS];
     readComparatorDigis(halfstrip);
@@ -319,7 +337,7 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::run(const CSCComparatorDigiColl
   // this shift does not affect the readout of the CLCTs
   // emulated CLCTs put in the event should be centered at bin 7 (as in data)
   for (auto& p : tmpV) {
-    p.setBX(p.getBX() + alctClctOffset_);
+    p.setBX(p.getBX() + CSCConstants::ALCT_CLCT_OFFSET);
   }
 
   return tmpV;
@@ -338,9 +356,6 @@ void CSCCathodeLCTProcessor::run(
   if (CLCTlist.size() > 1)
     sort(CLCTlist.begin(), CLCTlist.end(), std::greater<CSCCLCTDigi>());
 
-  // Take the best MAX_CLCTS_PER_PROCESSOR candidates per bx.
-  int CLCTIndex_[CSCConstants::MAX_CLCT_TBINS] = {};
-
   for (const auto& p : CLCTlist) {
     const int bx = p.getBX();
     if (bx >= CSCConstants::MAX_CLCT_TBINS) {
@@ -351,22 +366,37 @@ void CSCCathodeLCTProcessor::run(
       continue;
     }
 
-    CLCTContainer_[bx][CLCTIndex_[bx]] = p;
-    CLCTIndex_[bx]++;
+    if (!bestCLCT[bx].isValid()) {
+      bestCLCT[bx] = p;
+    } else if (!secondCLCT[bx].isValid()) {
+      secondCLCT[bx] = p;
+    }
   }
 
   for (int bx = 0; bx < CSCConstants::MAX_CLCT_TBINS; bx++) {
-    for (int iCLCT = 0; iCLCT < CSCConstants::MAX_CLCTS_PER_PROCESSOR; iCLCT++) {
-      if (CLCTContainer_[bx][iCLCT].isValid()) {
-        CLCTContainer_[bx][iCLCT].setTrknmb(iCLCT + 1);
-        if (infoV > 0) {
-          LogDebug("CSCCathodeLCTProcessor")
-              << CLCTContainer_[bx][iCLCT] << " found in "
-              << CSCDetId::chamberName(theEndcap, theStation, theRing, theChamber) << " (sector " << theSector
-              << " subsector " << theSubsector << " trig id. " << theTrigChamber << ")"
-              << "\n";
-        }
-      }
+    if (bestCLCT[bx].isValid()) {
+      bestCLCT[bx].setTrknmb(1);
+
+      // check if the LCT is valid
+      qualityControl_->checkValid(bestCLCT[bx]);
+
+      if (infoV > 0)
+        LogDebug("CSCCathodeLCTProcessor")
+            << bestCLCT[bx] << " found in " << CSCDetId::chamberName(theEndcap, theStation, theRing, theChamber)
+            << " (sector " << theSector << " subsector " << theSubsector << " trig id. " << theTrigChamber << ")"
+            << "\n";
+    }
+    if (secondCLCT[bx].isValid()) {
+      secondCLCT[bx].setTrknmb(2);
+
+      // check if the LCT is valid
+      qualityControl_->checkValid(secondCLCT[bx]);
+
+      if (infoV > 0)
+        LogDebug("CSCCathodeLCTProcessor")
+            << secondCLCT[bx] << " found in " << CSCDetId::chamberName(theEndcap, theStation, theRing, theChamber)
+            << " (sector " << theSector << " subsector " << theSubsector << " trig id. " << theTrigChamber << ")"
+            << "\n";
     }
   }
   // Now that we have our best CLCTs, they get correlated with the best
@@ -374,7 +404,7 @@ void CSCCathodeLCTProcessor::run(
 }
 
 bool CSCCathodeLCTProcessor::getDigis(const CSCComparatorDigiCollection* compdc) {
-  bool noDigis = true;
+  bool hasDigis = false;
 
   // Loop over layers and save comparator digis on each one into digiV[layer].
   for (int i_layer = 0; i_layer < CSCConstants::NUM_LAYERS; i_layer++) {
@@ -389,7 +419,7 @@ bool CSCCathodeLCTProcessor::getDigis(const CSCComparatorDigiCollection* compdc)
     }
 
     if (!digiV[i_layer].empty()) {
-      noDigis = false;
+      hasDigis = true;
       if (infoV > 1) {
         LogTrace("CSCCathodeLCTProcessor") << "found " << digiV[i_layer].size() << " comparator digi(s) in layer "
                                            << i_layer << " of " << detid.chamberName() << " (trig. sector " << theSector
@@ -398,7 +428,7 @@ bool CSCCathodeLCTProcessor::getDigis(const CSCComparatorDigiCollection* compdc)
     }
   }
 
-  return noDigis;
+  return hasDigis;
 }
 
 void CSCCathodeLCTProcessor::getDigis(const CSCComparatorDigiCollection* compdc, const CSCDetId& id) {
@@ -452,11 +482,11 @@ void CSCCathodeLCTProcessor::readComparatorDigis(
 
       // Get strip number.
       int thisStrip = pld->getStrip() - 1;  // count from 0
-      if (thisStrip < 0 || thisStrip >= numStrips) {
+      if (thisStrip < 0 || thisStrip >= numStrips_) {
         if (infoV >= 0)
           edm::LogWarning("L1CSCTPEmulatorWrongInput")
               << "+++ station " << theStation << " ring " << theRing << " chamber " << theChamber
-              << " Found comparator digi with wrong strip number = " << thisStrip << " (max strips = " << numStrips
+              << " Found comparator digi with wrong strip number = " << thisStrip << " (max strips = " << numStrips_
               << "); skipping it... +++\n";
         continue;
       }
@@ -464,7 +494,7 @@ void CSCCathodeLCTProcessor::readComparatorDigis(
       // comp   : comparator output
       // stagger: stagger for this layer
       int thisHalfstrip = 2 * thisStrip + thisComparator + stagger[i_layer];
-      if (thisHalfstrip >= 2 * numStrips + 1) {
+      if (thisHalfstrip >= numHalfStrips_) {
         if (infoV >= 0)
           edm::LogWarning("L1CSCTPEmulatorWrongInput")
               << "+++ station " << theStation << " ring " << theRing << " chamber " << theChamber
@@ -518,18 +548,15 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::findLCTs(
     const std::vector<int> halfstrip[CSCConstants::NUM_LAYERS][CSCConstants::NUM_HALF_STRIPS_7CFEBS]) {
   std::vector<CSCCLCTDigi> lctList;
 
-  // Max. number of half-strips for this chamber.
-  const int maxHalfStrips = 2 * numStrips + 1;
-
   if (infoV > 1)
-    dumpDigis(halfstrip, maxHalfStrips);
+    dumpDigis(halfstrip);
 
   // 2 possible LCTs per CSC x 7 LCT quantities
   int keystrip_data[CSCConstants::MAX_CLCTS_PER_PROCESSOR][CLCT_NUM_QUANTITIES] = {{0}};
   PulseArray pulse;
 
   // Fire half-strip one-shots for hit_persist bx's (4 bx's by default).
-  pulseExtension(halfstrip, maxHalfStrips, pulse);
+  pulseExtension(halfstrip, pulse);
 
   unsigned int start_bx = start_bx_shift;
   // Stop drift_delay bx's short of fifo_tbins since at later bx's we will
@@ -563,10 +590,10 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::findLCTs(
 
       // We check if there is at least one key half strip for which at least
       // one pattern id has at least the minimum number of hits
-      bool hits_in_time = patternFinding(pulse, maxHalfStrips, latch_bx, hits_in_patterns);
+      bool hits_in_time = patternFinding(pulse, latch_bx, hits_in_patterns);
       if (infoV > 1) {
         if (hits_in_time) {
-          for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < maxHalfStrips; hstrip++) {
+          for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < numHalfStrips_; hstrip++) {
             if (nhits[hstrip] > 0) {
               LogTrace("CSCCathodeLCTProcessor")
                   << " bx = " << std::setw(2) << latch_bx << " --->"
@@ -596,7 +623,7 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::findLCTs(
       // Calculate quality from pattern id and number of hits, and
       // simultaneously select best-quality LCT.
       if (hits_in_time) {
-        for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < maxHalfStrips; hstrip++) {
+        for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < numHalfStrips_; hstrip++) {
           // The bend-direction bit pid[0] is ignored (left and right
           // bends have equal quality).
           quality[hstrip] = (best_pid[hstrip] & 14) | (nhits[hstrip] << 5);
@@ -614,24 +641,23 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::findLCTs(
         }
       }
 
-      // If 1st best CLCT is found, look for other CLCTs!
+      // If 1st best CLCT is found, look for the 2nd best.
       if (best_halfstrip[0] >= 0) {
-        for (int ilct = 1; ilct < CSCConstants::MAX_CLCTS_PER_PROCESSOR; ilct++) {
-          // Mark keys near best CLCT as busy by setting their quality to zero, and repeat the search.
-          markBusyKeys(best_halfstrip[ilct - 1], best_pid[best_halfstrip[ilct - 1]], quality);
+        // Mark keys near best CLCT as busy by setting their quality to
+        // zero, and repeat the search.
+        markBusyKeys(best_halfstrip[0], best_pid[best_halfstrip[0]], quality);
 
-          for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < maxHalfStrips; hstrip++) {
-            if (quality[hstrip] > best_quality[ilct]) {
-              best_halfstrip[ilct] = hstrip;
-              best_quality[ilct] = quality[hstrip];
-            }
-            if (infoV > 1 && quality[hstrip] > 0) {
-              LogTrace("CSCCathodeLCTProcessor")
-                  << "CLCT " << ilct + 1 << ": halfstrip = " << std::setw(3) << hstrip << " quality = " << std::setw(3)
-                  << quality[hstrip] << " nhits = " << std::setw(3) << nhits[hstrip] << " pid = " << std::setw(3)
-                  << best_pid[hstrip] << " best halfstrip = " << std::setw(3) << best_halfstrip[1]
-                  << " best quality = " << std::setw(3) << best_quality[1];
-            }
+        for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < numHalfStrips_; hstrip++) {
+          if (quality[hstrip] > best_quality[1]) {
+            best_halfstrip[1] = hstrip;
+            best_quality[1] = quality[hstrip];
+          }
+          if (infoV > 1 && quality[hstrip] > 0) {
+            LogTrace("CSCCathodeLCTProcessor")
+                << " 2nd CLCT: halfstrip = " << std::setw(3) << hstrip << " quality = " << std::setw(3)
+                << quality[hstrip] << " nhits = " << std::setw(3) << nhits[hstrip] << " pid = " << std::setw(3)
+                << best_pid[hstrip] << " best halfstrip = " << std::setw(3) << best_halfstrip[1]
+                << " best quality = " << std::setw(3) << best_quality[1];
           }
         }
 
@@ -648,8 +674,14 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::findLCTs(
             keystrip_data[ilct][CLCT_STRIP_TYPE] = 1;  // obsolete
             keystrip_data[ilct][CLCT_QUALITY] = nhits[best_hs];
             keystrip_data[ilct][CLCT_CFEB] = keystrip_data[ilct][CLCT_STRIP] / CSCConstants::NUM_HALF_STRIPS_PER_CFEB;
-            const uint16_t halfstrip_in_cfeb = keystrip_data[ilct][CLCT_STRIP] -
-                                               CSCConstants::NUM_HALF_STRIPS_PER_CFEB * keystrip_data[ilct][CLCT_CFEB];
+            int halfstrip_in_cfeb = keystrip_data[ilct][CLCT_STRIP] -
+                                    CSCConstants::NUM_HALF_STRIPS_PER_CFEB * keystrip_data[ilct][CLCT_CFEB];
+
+            if (infoV > 1)
+              LogTrace("CSCCathodeLCTProcessor")
+                  << " Final selection: ilct " << ilct << " key halfstrip " << keystrip_data[ilct][CLCT_STRIP]
+                  << " quality " << keystrip_data[ilct][CLCT_QUALITY] << " pattern "
+                  << keystrip_data[ilct][CLCT_PATTERN] << " bx " << keystrip_data[ilct][CLCT_BX];
 
             CSCCLCTDigi thisLCT(1,
                                 keystrip_data[ilct][CLCT_QUALITY],
@@ -658,22 +690,33 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::findLCTs(
                                 keystrip_data[ilct][CLCT_BEND],
                                 halfstrip_in_cfeb,
                                 keystrip_data[ilct][CLCT_CFEB],
-                                keystrip_data[ilct][CLCT_BX]);
+                                keystrip_data[ilct][CLCT_BX],
+                                0,
+                                // track number is assigned later
+                                0,
+                                // comparator code is assigned for Run-3 and Phase-2
+                                -1,
+                                // default version is legacy
+                                CSCCLCTDigi::Version::Legacy);
 
             // get the comparator hits for this pattern
-            auto compHits = hits_in_patterns[best_hs][keystrip_data[ilct][CLCT_PATTERN]];
-
-            // purge the comparator digi collection from the obsolete "65535" entries...
-            cleanComparatorContainer(compHits);
+            const auto& compHits = hits_in_patterns[best_hs][keystrip_data[ilct][CLCT_PATTERN]];
 
             // set the hit collection
             thisLCT.setHits(compHits);
+
+            // do the CCLUT procedures
+            if (runCCLUT_) {
+              runCCLUT(thisLCT);
+            }
+
+            // purge the comparator digi collection from the obsolete "65535" entries...
+            cleanComparatorContainer(thisLCT);
 
             // useful debugging
             if (infoV > 1) {
               LogTrace("CSCCathodeLCTProcessor") << " Final selection: ilct " << ilct << " " << thisLCT << std::endl;
             }
-
             // put the CLCT into the collection
             lctList.push_back(thisLCT);
           }
@@ -692,9 +735,9 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::findLCTs(
       unsigned int stop_time = fifo_tbins - drift_delay;
       for (unsigned int bx = latch_bx + 1; bx < stop_time; bx++) {
         bool return_to_idle = true;
-        bool hits_in_time = patternFinding(pulse, maxHalfStrips, bx, hits_in_patterns);
+        bool hits_in_time = patternFinding(pulse, bx, hits_in_patterns);
         if (hits_in_time) {
-          for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < maxHalfStrips; hstrip++) {
+          for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < numHalfStrips_; hstrip++) {
             // the dead-time is done at the pre-trigger, not at the trigger
             if (nhits[hstrip] >= nplanes_hit_pretrig) {
               if (infoV > 1)
@@ -722,9 +765,7 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::findLCTs(
 
 // Common to all versions.
 void CSCCathodeLCTProcessor::pulseExtension(
-    const std::vector<int> time[CSCConstants::NUM_LAYERS][CSCConstants::NUM_HALF_STRIPS_7CFEBS],
-    const int nStrips,
-    PulseArray pulse) {
+    const std::vector<int> time[CSCConstants::NUM_LAYERS][CSCConstants::NUM_HALF_STRIPS_7CFEBS], PulseArray pulse) {
   static const unsigned int bits_in_pulse = 8 * sizeof(pulse[0][0]);
 
   // Clear pulse array.  This array will be used as a bit representation of
@@ -736,12 +777,12 @@ void CSCCathodeLCTProcessor::pulseExtension(
   // of 3 would look like 0000000000111000.  This is similating the digital
   // one-shot in the TMB.
   for (int i_layer = 0; i_layer < CSCConstants::NUM_LAYERS; i_layer++)
-    for (int i_strip = 0; i_strip < nStrips; i_strip++)
+    for (int i_strip = 0; i_strip < numHalfStrips_; i_strip++)
       pulse[i_layer][i_strip] = 0;
 
   // Loop over all layers and halfstrips.
   for (int i_layer = 0; i_layer < CSCConstants::NUM_LAYERS; i_layer++) {
-    for (int i_strip = 0; i_strip < nStrips; i_strip++) {
+    for (int i_strip = 0; i_strip < numHalfStrips_; i_strip++) {
       // If there is a hit, simulate digital one-shot persistence starting
       // in the bx of the initial hit.  Fill this into pulse[][].
       if (!time[i_layer][i_strip].empty()) {
@@ -771,9 +812,6 @@ bool CSCCathodeLCTProcessor::preTrigger(const PulseArray pulse, const int start_
   if (infoV > 1)
     LogTrace("CSCCathodeLCTProcessor") << "....................PreTrigger...........................";
 
-  // Max. number of half-strips for this chamber.
-  const int nStrips = 2 * numStrips + 1;
-
   int nPreTriggers = 0;
 
   bool pre_trig = false;
@@ -788,9 +826,9 @@ bool CSCCathodeLCTProcessor::preTrigger(const PulseArray pulse, const int start_
     std::map<int, std::map<int, CSCCLCTDigi::ComparatorContainer>> hits_in_patterns;
     hits_in_patterns.clear();
 
-    bool hits_in_time = patternFinding(pulse, nStrips, bx_time, hits_in_patterns);
+    bool hits_in_time = patternFinding(pulse, bx_time, hits_in_patterns);
     if (hits_in_time) {
-      for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < nStrips; hstrip++) {
+      for (int hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; hstrip < numHalfStrips_; hstrip++) {
         if (infoV > 1) {
           if (nhits[hstrip] > 0) {
             LogTrace("CSCCathodeLCTProcessor")
@@ -831,7 +869,6 @@ bool CSCCathodeLCTProcessor::preTrigger(const PulseArray pulse, const int start_
 // TMB-07 version.
 bool CSCCathodeLCTProcessor::patternFinding(
     const PulseArray pulse,
-    const int nStrips,
     const unsigned int bx_time,
     std::map<int, std::map<int, CSCCLCTDigi::ComparatorContainer>>& hits_in_patterns) {
   if (bx_time >= fifo_tbins)
@@ -842,7 +879,7 @@ bool CSCCathodeLCTProcessor::patternFinding(
   // substantially.
   unsigned int layers_hit = 0;
   for (int i_layer = 0; i_layer < CSCConstants::NUM_LAYERS; i_layer++) {
-    for (int i_hstrip = 0; i_hstrip < nStrips; i_hstrip++) {
+    for (int i_hstrip = 0; i_hstrip < numHalfStrips_; i_hstrip++) {
       if (((pulse[i_layer][i_hstrip] >> bx_time) & 1) == 1) {
         layers_hit++;
         break;
@@ -852,7 +889,7 @@ bool CSCCathodeLCTProcessor::patternFinding(
   if (layers_hit < nplanes_hit_pretrig)
     return false;
 
-  for (int key_hstrip = 0; key_hstrip < nStrips; key_hstrip++) {
+  for (int key_hstrip = 0; key_hstrip < numHalfStrips_; key_hstrip++) {
     best_pid[key_hstrip] = 0;
     nhits[key_hstrip] = 0;
     first_bx_corrected[key_hstrip] = -999;
@@ -861,9 +898,9 @@ bool CSCCathodeLCTProcessor::patternFinding(
   bool hit_layer[CSCConstants::NUM_LAYERS];
 
   // Loop over candidate key strips.
-  for (int key_hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; key_hstrip < nStrips; key_hstrip++) {
+  for (int key_hstrip = stagger[CSCConstants::KEY_CLCT_LAYER - 1]; key_hstrip < numHalfStrips_; key_hstrip++) {
     // Loop over patterns and look for hits matching each pattern.
-    for (unsigned int pid = clct_pattern_.size() - 1; pid >= pid_thresh_pretrig; pid--) {
+    for (unsigned int pid = clct_pattern_.size() - 1; pid >= pid_thresh_pretrig and pid < clct_pattern_.size(); pid--) {
       layers_hit = 0;
       // clear all layers
       for (int ilayer = 0; ilayer < CSCConstants::NUM_LAYERS; ilayer++) {
@@ -894,7 +931,7 @@ bool CSCCathodeLCTProcessor::patternFinding(
           int this_strip = CSCPatternBank::clct_pattern_offset_[strip_num] + key_hstrip;
 
           // current strip should be valid of course
-          if (this_strip >= 0 && this_strip < nStrips) {
+          if (this_strip >= 0 && this_strip < numHalfStrips_) {
             if (infoV > 3) {
               LogTrace("CSCCathodeLCTProcessor") << " In patternFinding: key_strip = " << key_hstrip << " pid = " << pid
                                                  << " layer = " << this_layer << " strip = " << this_strip << std::endl;
@@ -989,12 +1026,14 @@ void CSCCathodeLCTProcessor::markBusyKeys(const int best_hstrip,
   }
 }  // markBusyKeys -- TMB-07 version.
 
-void CSCCathodeLCTProcessor::cleanComparatorContainer(CSCCLCTDigi::ComparatorContainer& compHits) const {
-  for (auto& p : compHits) {
+void CSCCathodeLCTProcessor::cleanComparatorContainer(CSCCLCTDigi& clct) const {
+  CSCCLCTDigi::ComparatorContainer newHits = clct.getHits();
+  for (auto& p : newHits) {
     p.erase(std::remove_if(
                 p.begin(), p.end(), [](unsigned i) -> bool { return i == CSCCathodeLCTProcessor::INVALID_HALFSTRIP; }),
             p.end());
   }
+  clct.setHits(newHits);
 }
 
 // --------------------------------------------------------------------------
@@ -1021,13 +1060,11 @@ void CSCCathodeLCTProcessor::dumpConfigParams() const {
 
 // Reasonably nice dump of digis on half-strips.
 void CSCCathodeLCTProcessor::dumpDigis(
-    const std::vector<int> strip[CSCConstants::NUM_LAYERS][CSCConstants::NUM_HALF_STRIPS_7CFEBS],
-    const int nStrips) const {
-  LogDebug("CSCCathodeLCTProcessor") << CSCDetId::chamberName(theEndcap, theStation, theRing, theChamber)
-                                     << " strip type: half-strip,  nStrips " << nStrips;
+    const std::vector<int> strip[CSCConstants::NUM_LAYERS][CSCConstants::NUM_HALF_STRIPS_7CFEBS]) const {
+  LogDebug("CSCCathodeLCTProcessor") << theCSCName_ << " strip type: half-strip,  numHalfStrips " << numHalfStrips_;
 
   std::ostringstream strstrm;
-  for (int i_strip = 0; i_strip < nStrips; i_strip++) {
+  for (int i_strip = 0; i_strip < numHalfStrips_; i_strip++) {
     if (i_strip % 10 == 0) {
       if (i_strip < 100)
         strstrm << i_strip / 10;
@@ -1039,14 +1076,14 @@ void CSCCathodeLCTProcessor::dumpDigis(
       strstrm << " ";
   }
   strstrm << "\n";
-  for (int i_strip = 0; i_strip < nStrips; i_strip++) {
+  for (int i_strip = 0; i_strip < numHalfStrips_; i_strip++) {
     strstrm << i_strip % 10;
     if ((i_strip + 1) % CSCConstants::NUM_HALF_STRIPS_PER_CFEB == 0)
       strstrm << " ";
   }
   for (int i_layer = 0; i_layer < CSCConstants::NUM_LAYERS; i_layer++) {
     strstrm << "\n";
-    for (int i_strip = 0; i_strip < nStrips; i_strip++) {
+    for (int i_strip = 0; i_strip < numHalfStrips_; i_strip++) {
       if (!strip[i_layer][i_strip].empty()) {
         std::vector<int> bx_times = strip[i_layer][i_strip];
         // Dump only the first in time.
@@ -1103,7 +1140,7 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::readoutCLCTs(int nMaxCLCTs) con
   // Start from the vector of all found CLCTs and select those within
   // the CLCT*L1A coincidence window.
   int bx_readout = -1;
-  const std::vector<CSCCLCTDigi>& all_lcts = getCLCTs();
+  const std::vector<CSCCLCTDigi>& all_lcts = getCLCTs(nMaxCLCTs);
   for (const auto& p : all_lcts) {
     // only consider valid CLCTs
     if (!p.isValid())
@@ -1141,9 +1178,10 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::readoutCLCTs(int nMaxCLCTs) con
       tmpV.push_back(p);
   }
 
-  // remove the CLCTs with an index larger than nMaxCLCTs
-  if (tmpV.size() > unsigned(nMaxCLCTs)) {
-    tmpV.erase(tmpV.begin() + nMaxCLCTs, tmpV.end());
+  // do a final check on the CLCTs in readout
+  qualityControl_->checkMultiplicityBX(tmpV);
+  for (const auto& clct : tmpV) {
+    qualityControl_->checkValid(clct, nMaxCLCTs);
   }
 
   return tmpV;
@@ -1198,14 +1236,13 @@ std::vector<CSCCLCTPreTriggerDigi> CSCCathodeLCTProcessor::preTriggerDigisME1b()
 }
 
 // Returns vector of all found CLCTs, if any.  Used for ALCT-CLCT matching.
-std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::getCLCTs() const {
+std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::getCLCTs(unsigned nMaxCLCTs) const {
   std::vector<CSCCLCTDigi> tmpV;
   for (int bx = 0; bx < CSCConstants::MAX_CLCT_TBINS; bx++) {
-    for (int iCLCT = 0; iCLCT < CSCConstants::MAX_CLCTS_PER_PROCESSOR; iCLCT++) {
-      if (CLCTContainer_[bx][iCLCT].isValid()) {
-        tmpV.push_back(CLCTContainer_[bx][iCLCT]);
-      }
-    }
+    if (bestCLCT[bx].isValid())
+      tmpV.push_back(bestCLCT[bx]);
+    if (secondCLCT[bx].isValid())
+      tmpV.push_back(secondCLCT[bx]);
   }
   return tmpV;
 }
@@ -1216,13 +1253,208 @@ std::vector<CSCCLCTDigi> CSCCathodeLCTProcessor::getCLCTs() const {
 // to make a proper comparison with ALCTs we need
 // CLCT and ALCT to have the central BX in the same bin
 CSCCLCTDigi CSCCathodeLCTProcessor::getBestCLCT(int bx) const {
-  CSCCLCTDigi lct = CLCTContainer_[bx][0];
-  lct.setBX(lct.getBX() + alctClctOffset_);
+  CSCCLCTDigi lct = bestCLCT[bx];
+  lct.setBX(lct.getBX() + CSCConstants::ALCT_CLCT_OFFSET);
   return lct;
 }
 
 CSCCLCTDigi CSCCathodeLCTProcessor::getSecondCLCT(int bx) const {
-  CSCCLCTDigi lct = CLCTContainer_[bx][1];
-  lct.setBX(lct.getBX() + alctClctOffset_);
+  CSCCLCTDigi lct = secondCLCT[bx];
+  lct.setBX(lct.getBX() + CSCConstants::ALCT_CLCT_OFFSET);
   return lct;
+}
+
+// --------Functions for the comparator code algorith for Run-3 ---------//
+
+int CSCCathodeLCTProcessor::calculateComparatorCode(const std::array<std::array<int, 3>, 6>& halfStripPattern) const {
+  int id = 0;
+
+  for (unsigned int column = 0; column < CSCConstants::NUM_LAYERS; column++) {
+    int rowPat = 0;   //physical arrangement of the three bits
+    int rowCode = 0;  //code used to identify the arrangement
+
+    //use Firmware definition for comparator code definition
+    for (int row = 2; row >= 0; row--) {
+      rowPat = rowPat << 1;  //bitshift the last number to the left
+      rowPat += halfStripPattern[column][row];
+    }
+    switch (rowPat) {
+      case 0:  //000
+        rowCode = 0;
+        break;
+      case 1:  //00X
+        rowCode = 1;
+        break;
+      case 2:  //0X0
+        rowCode = 2;
+        break;
+      case 4:  //00X
+        rowCode = 3;
+        break;
+      default:
+        // default return value is -1
+        return -1;
+    }
+    //each column has two bits of information, largest layer is most significant bit
+    id += (rowCode << 2 * column);
+  }
+  return id;
+}
+
+void CSCCathodeLCTProcessor::assignPositionCC(const unsigned offset,
+                                              std::tuple<int16_t, bool, bool>& returnValue) const {
+  /*
+    | Value | Half-Strip Offset  | Delta Half-Strip  | Quarter-Strip Bit  | Eighth-Strip Bit |
+    |-------|--------------------|-------------------|--------------------|------------------|
+    |   0   |   -7/4             |   -2              |   0                |   1              |
+    |   1   |   -3/2             |   -2              |   1                |   0              |
+    |   2   |   -5/4             |   -2              |   1                |   1              |
+    |   3   |   -1               |   -1              |   0                |   0              |
+    |   4   |   -3/4             |   -1              |   0                |   1              |
+    |   5   |   -1/2             |   -1              |   1                |   0              |
+    |   6   |   -1/4             |   -1              |   1                |   1              |
+    |   7   |   0                |   0               |   0                |   0              |
+    |   8   |   1/4              |   0               |   0                |   1              |
+    |   9   |   1/2              |   0               |   1                |   0              |
+    |   10  |   3/4              |   0               |   1                |   1              |
+    |   11  |   1                |   1               |   0                |   0              |
+    |   12  |   5/4              |   1               |   0                |   1              |
+    |   13  |   3/2              |   1               |   1                |   0              |
+    |   14  |   7/4              |   1               |   1                |   1              |
+    |   15  |   2                |   2               |   0                |   0              |
+   */
+  std::vector<std::tuple<int16_t, bool, bool>> my_tuple = {
+      {-2, false, true},
+      {-2, true, false},
+      {-2, true, true},
+      {-1, false, false},
+      {-1, false, true},
+      {-1, true, false},
+      {-1, true, true},
+      {0, false, false},
+      {0, false, true},
+      {0, true, false},
+      {0, true, true},
+      {1, false, false},
+      {1, false, true},
+      {1, true, false},
+      {1, true, true},
+      {2, false, false},
+  };
+  returnValue = my_tuple[offset];
+}
+
+void CSCCathodeLCTProcessor::runCCLUT(CSCCLCTDigi& digi) const {
+  // print out the old CLCT for debugging
+  if (infoV > 2) {
+    std::ostringstream strm;
+    strm << "\n";
+    strm << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+    strm << "+                  Before CCCLUT algorithm:                       +\n";
+    strm << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+    strm << " Old CLCT digi " << digi << "\n";
+    strm << " 1/4 strip bit " << digi.getQuartStrip() << " 1/8 strip bit " << digi.getEighthStrip() << "\n";
+    strm << " 1/4 strip number " << digi.getKeyStrip(4) << " 1/8 strip number " << digi.getKeyStrip(8) << "\n";
+    strm << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+    LogDebug("CSCCathodeLCTProcessor") << strm.str();
+  }
+
+  // set Run-3 flag
+  digi.setRun3(true);
+
+  // Get the comparator hits
+  auto compHits = digi.getHits();
+
+  // Wrap the comparator code in a format for calculation
+  std::array<std::array<int, 3>, CSCConstants::NUM_LAYERS> compHitsCC;
+
+  for (int i = 0; i < CSCConstants::NUM_LAYERS; i++) {
+    int iCC = 0;
+    for (int j = 0; j < CSCConstants::CLCT_PATTERN_WIDTH; j++) {
+      // only fill when the pattern is active
+      if (clct_pattern_[digi.getPattern()][i][j]) {
+        if (compHits[i][j] != INVALID_HALFSTRIP) {
+          compHitsCC[i][iCC] = 1;
+        } else {
+          compHitsCC[i][iCC] = 0;
+        }
+        iCC++;
+      }
+    }
+  }
+
+  // calculate the comparator code
+  const int comparatorCode(calculateComparatorCode(compHitsCC));
+
+  // store the comparator code
+  digi.setCompCode(comparatorCode);
+
+  // calculate the slope and position offset
+  const int pattern(digi.getPattern());
+
+  // set the Run-3 pattern
+  digi.setRun3Pattern(pattern);
+
+  // look-up the unsigned values
+  const unsigned positionCC(lutpos_[pattern]->lookup(comparatorCode));
+  const unsigned slopeCC(lutslope_[pattern]->lookup(comparatorCode));
+  const unsigned run2PatternCC(convertSlopeToRun2Pattern(slopeCC));
+
+  // if the slope is negative, set bending to 0
+  const bool slopeCCSign((slopeCC >> 4) & 0x1);
+  const unsigned slopeCCValue(slopeCC & 0xf);
+  digi.setBend(slopeCCSign);
+
+  // calculate the new position
+  uint16_t halfstrip = digi.getKeyStrip();
+  std::tuple<int16_t, bool, bool> stripoffset;
+  assignPositionCC(positionCC, stripoffset);
+  const int halfstripoffset = std::get<0>(stripoffset);
+  halfstrip += halfstripoffset;
+
+  // calculate the new CFEB number
+  int newCFEB = digi.getCFEB();
+
+  // case where key half-strip is on the lower edge of the CFEB
+  if (digi.getStrip() == 0 and halfstripoffset <= -1 and digi.getCFEB() > 0) {
+    newCFEB = digi.getCFEB() - 1;
+  }
+  // case where key half-strip is on the upper edge of the CFEB
+  if (digi.getStrip() == CSCConstants::NUM_HALF_STRIPS_PER_CFEB - 1 and halfstripoffset >= 1 and
+      digi.getCFEB() < numCFEBs_) {
+    newCFEB = digi.getCFEB() + 1;
+  }
+
+  digi.setCFEB(newCFEB);
+
+  // store the new 1/2, 1/4 and 1/8 strip positions
+  digi.setStrip(halfstrip - digi.getCFEB() * CSCConstants::NUM_HALF_STRIPS_PER_CFEB);
+  digi.setQuartStrip(std::get<1>(stripoffset));
+  digi.setEighthStrip(std::get<2>(stripoffset));
+
+  // store the bending angle value in the pattern data member
+  digi.setSlope(slopeCCValue);
+
+  // set the quasi Run-2 pattern - to accommodate integration with EMTF/OMTF
+  digi.setPattern(run2PatternCC);
+
+  // now print out the new CLCT for debugging
+  if (infoV > 2) {
+    std::ostringstream strm;
+    strm << "\n";
+    strm << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+    strm << "+                  CCCLUT algorithm results:                       +\n";
+    strm << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+    strm << " New CLCT digi " << digi << "\n";
+    strm << " 1/4 strip bit " << digi.getQuartStrip() << " 1/8 strip bit " << digi.getEighthStrip() << "\n";
+    strm << " 1/4 strip number " << digi.getKeyStrip(4) << " 1/8 strip number " << digi.getKeyStrip(8) << "\n";
+    strm << "++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++\n";
+    LogDebug("CSCCathodeLCTProcessor") << strm.str();
+  }
+}
+
+unsigned CSCCathodeLCTProcessor::convertSlopeToRun2Pattern(const unsigned slope) const {
+  const unsigned slopeList[32] = {10, 10, 10, 8, 8, 8, 6, 6, 6, 6, 4, 4, 2, 2, 2, 2,
+                                  10, 10, 10, 9, 9, 9, 7, 7, 7, 7, 5, 5, 3, 3, 3, 3};
+  return slopeList[slope];
 }

@@ -78,58 +78,42 @@ const EnergyScaleCorrection::ScaleCorrection* EnergyScaleCorrection::getScaleCor
     unsigned int runnr, double et, double eta, double r9, unsigned int gainSeed) const {
   // buld the category based on the values of the object
   CorrectionCategory category(runnr, et, eta, r9, gainSeed);
-  auto result =
-      std::equal_range(scales_.begin(), scales_.end(), category, Sorter<CorrectionCategory, ScaleCorrection>());
-  auto nrFound = std::distance(result.first, result.second);
-  if (nrFound == 0) {
+  auto result = scales_.find(category);
+
+  if (result == scales_.end()) {
     edm::LogInfo("EnergyScaleCorrection")
         << "Scale category not found: " << category << " Returning uncorrected value.";
     return nullptr;
-  } else if (nrFound > 1) {
-    std::ostringstream foundCats;
-    for (auto it = result.first; it != result.second; ++it) {
-      foundCats << "    " << it->first << std::endl;
-    }
-    throw cms::Exception("ConfigError") << " scale error category " << category << " has " << nrFound << " entries "
-                                        << std::endl
-                                        << foundCats.str();
   }
+
   //validate the result, just to be sure
-  if (!result.first->first.inCategory(runnr, et, eta, r9, gainSeed)) {
-    throw cms::Exception("LogicError") << " error found scale category " << result.first->first
+  if (!result->first.inCategory(runnr, et, eta, r9, gainSeed)) {
+    throw cms::Exception("LogicError") << " error found scale category " << result->first
                                        << " that does not contain run " << runnr << " et " << et << " eta " << eta
                                        << " r9 " << r9 << " gain seed " << gainSeed;
   }
-  return &result.first->second;
+  return &result->second;
 }
 
 const EnergyScaleCorrection::SmearCorrection* EnergyScaleCorrection::getSmearCorr(
     unsigned int runnr, double et, double eta, double r9, unsigned int gainSeed) const {
   // buld the category based on the values of the object
   CorrectionCategory category(runnr, et, eta, r9, gainSeed);
-  auto result =
-      std::equal_range(smearings_.begin(), smearings_.end(), category, Sorter<CorrectionCategory, SmearCorrection>());
-  auto nrFound = std::distance(result.first, result.second);
-  if (nrFound == 0) {
+  auto result = smearings_.find(category);
+
+  if (result == smearings_.end()) {
     edm::LogInfo("EnergyScaleCorrection")
         << "Smear category not found: " << category << " Returning uncorrected value.";
     return nullptr;
-  } else if (nrFound > 1) {
-    std::ostringstream foundCats;
-    for (auto it = result.first; it != result.second; ++it) {
-      foundCats << "    " << it->first << std::endl;
-    }
-    throw cms::Exception("ConfigError") << " error smear category " << category << " has " << nrFound << " entries "
-                                        << std::endl
-                                        << foundCats.str();
   }
+
   //validate the result, just to be sure
-  if (!result.first->first.inCategory(runnr, et, eta, r9, gainSeed)) {
-    throw cms::Exception("LogicError") << " error found smear category " << result.first->first
+  if (!result->first.inCategory(runnr, et, eta, r9, gainSeed)) {
+    throw cms::Exception("LogicError") << " error found smear category " << result->first
                                        << " that does not contain run " << runnr << " et " << et << " eta " << eta
                                        << " r9 " << r9 << " gain seed " << gainSeed;
   }
-  return &result.first->second;
+  return &result->second;
 }
 
 void EnergyScaleCorrection::addScale(const std::string& category,
@@ -140,14 +124,13 @@ void EnergyScaleCorrection::addScale(const std::string& category,
                                      double energyScaleErrSyst,
                                      double energyScaleErrGain) {
   CorrectionCategory cat(category, runMin, runMax);  // build the category from the string
-  auto result = std::equal_range(scales_.begin(), scales_.end(), cat, Sorter<CorrectionCategory, ScaleCorrection>());
+  auto result = scales_.equal_range(cat);
   if (result.first != result.second) {
     throw cms::Exception("ConfigError") << "Category already defined! " << cat;
   }
 
   ScaleCorrection corr(energyScale, energyScaleErrStat, energyScaleErrSyst, energyScaleErrGain);
-  scales_.push_back({cat, corr});
-  std::sort(scales_.begin(), scales_.end(), Sorter<CorrectionCategory, ScaleCorrection>());
+  scales_.insert(result.first, {cat, corr});  //use a hint where to insert
 }
 
 void EnergyScaleCorrection::addScale(int runMin,
@@ -165,14 +148,13 @@ void EnergyScaleCorrection::addScale(int runMin,
                                      double energyScaleErrGain) {
   CorrectionCategory cat(runMin, runMax, etaMin, etaMax, r9Min, r9Max, etMin, etMax, gain);
 
-  auto result = std::equal_range(scales_.begin(), scales_.end(), cat, Sorter<CorrectionCategory, ScaleCorrection>());
+  auto result = scales_.equal_range(cat);
   if (result.first != result.second) {
     throw cms::Exception("ConfigError") << "Category already defined! " << cat;
   }
 
   ScaleCorrection corr(energyScale, energyScaleErrStat, energyScaleErrSyst, energyScaleErrGain);
-  scales_.push_back({cat, corr});
-  std::sort(scales_.begin(), scales_.end(), Sorter<CorrectionCategory, ScaleCorrection>());
+  scales_.insert(result.first, {cat, corr});
 }
 
 void EnergyScaleCorrection::addSmearing(const std::string& category,
@@ -185,16 +167,14 @@ void EnergyScaleCorrection::addSmearing(const std::string& category,
                                         double eMean,
                                         double errEMean) {
   CorrectionCategory cat(category);
-
-  auto res = std::equal_range(smearings_.begin(), smearings_.end(), cat, Sorter<CorrectionCategory, SmearCorrection>());
+  auto res = smearings_.equal_range(cat);
 
   if (res.first != res.second) {
     throw cms::Exception("EnergyScaleCorrection") << "Smearing category already defined " << cat;
   }
 
   SmearCorrection corr(rho, errRho, phi, errPhi, eMean, errEMean);
-  smearings_.push_back({cat, corr});
-  std::sort(smearings_.begin(), smearings_.end(), Sorter<CorrectionCategory, SmearCorrection>());
+  smearings_.insert(res.first, {cat, corr});  //use a hint from res
 }
 
 void EnergyScaleCorrection::setSmearingType(FileFormat value) {
@@ -387,11 +367,11 @@ EnergyScaleCorrection::CorrectionCategory::CorrectionCategory(const std::string&
     etaMax_ = 3;
   } else {
     if (p1 != std::string::npos) {
-      p1 = category.find("_", p1);
-      p2 = category.find("_", p1 + 1);
+      p1 = category.find('_', p1);
+      p2 = category.find('_', p1 + 1);
       etaMin_ = std::stof(category.substr(p1 + 1, p2 - p1 - 1));
       p1 = p2;
-      p2 = category.find("-", p1);
+      p2 = category.find('-', p1);
       etaMax_ = std::stof(category.substr(p1 + 1, p2 - p1 - 1));
     }
   }
@@ -417,11 +397,11 @@ EnergyScaleCorrection::CorrectionCategory::CorrectionCategory(const std::string&
   p1 = category.find("-Et_");
 
   if (p1 != std::string::npos) {
-    p1 = category.find("_", p1);
-    p2 = category.find("_", p1 + 1);
+    p1 = category.find('_', p1);
+    p2 = category.find('_', p1 + 1);
     etMin_ = std::stof(category.substr(p1 + 1, p2 - p1 - 1));
     p1 = p2;
-    p2 = category.find("-", p1);
+    p2 = category.find('-', p1);
     etMax_ = std::stof(category.substr(p1 + 1, p2 - p1 - 1));
   }
 
@@ -437,13 +417,13 @@ EnergyScaleCorrection::CorrectionCategory::CorrectionCategory(const std::string&
   // R9 region
   p1 = category.find("-R9");
   if (p1 != std::string::npos) {
-    p1 = category.find("_", p1);
-    p2 = category.find("_", p1 + 1);
+    p1 = category.find('_', p1);
+    p2 = category.find('_', p1 + 1);
     r9Min_ = std::stof(category.substr(p1 + 1, p2 - p1 - 1));
     // If there is one value, just set lower bound
     if (p2 != std::string::npos) {
       p1 = p2;
-      p2 = category.find("-", p1);
+      p2 = category.find('-', p1);
       r9Max_ = std::stof(category.substr(p1 + 1, p2 - p1 - 1));
       if (r9Max_ >= 1.0)
         r9Max_ = std::numeric_limits<float>::max();
@@ -453,7 +433,7 @@ EnergyScaleCorrection::CorrectionCategory::CorrectionCategory(const std::string&
   p1 = category.find("gainEle_");  // Position of first character
   if (p1 != std::string::npos) {
     p1 += 8;                      // Position of character after _
-    p2 = category.find("-", p1);  // Position of - or end of string
+    p2 = category.find('-', p1);  // Position of - or end of string
     gain_ = std::stoul(category.substr(p1, p2 - p1), nullptr);
   }
   //so turns out the code does an inclusive X<=Y<=Z search for bins

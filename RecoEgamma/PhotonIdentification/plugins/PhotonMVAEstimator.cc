@@ -6,7 +6,7 @@
 #include "RecoEgamma/EgammaTools/interface/AnyMVAEstimatorRun2Base.h"
 #include "DataFormats/EgammaCandidates/interface/Photon.h"
 #include "CommonTools/Egamma/interface/EffectiveAreas.h"
-#include "CondFormats/EgammaObjects/interface/GBRForest.h"
+#include "CondFormats/GBRForest/interface/GBRForest.h"
 #include "RecoEgamma/EgammaTools/interface/MVAVariableHelper.h"
 #include "RecoEgamma/EgammaTools/interface/MVAVariableManager.h"
 #include "CommonTools/Utils/interface/StringCutObjectSelector.h"
@@ -115,6 +115,7 @@ float PhotonMVAEstimator::mvaValue(const reco::Candidate* candPtr,
 
   std::vector<float> vars;
 
+  vars.reserve(nVariables_[iCategory]);
   for (int i = 0; i < nVariables_[iCategory]; ++i) {
     vars.push_back(mvaVarMngr_.getValue(variables_[iCategory][i], *phoPtr, auxVars));
   }

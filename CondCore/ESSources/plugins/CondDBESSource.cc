@@ -22,8 +22,10 @@
 #include "CondCore/ESSources/interface/DataProxy.h"
 
 #include "CondCore/CondDB/interface/PayloadProxy.h"
+#include "FWCore/Catalog/interface/SiteLocalConfig.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
+#include "FWCore/ServiceRegistry/interface/Service.h"
 #include <exception>
 
 #include <iomanip>
@@ -79,7 +81,7 @@ namespace {
     //if ( proxy.proxy()->stats.nLoad>0) {
     out << "Time look up, payloadIds:" << std::endl;
     const auto& pids = *proxy.requests();
-    for (auto id : pids)
+    for (const auto& id : pids)
       out << "   " << id.since << " - " << id.till << " : " << id.payloadId << std::endl;
   }
 
@@ -123,6 +125,17 @@ CondDBESSource::CondDBESSource(const edm::ParameterSet& iConfig)
     globaltag = iConfig.getParameter<std::string>("globaltag");
     // the global tag _requires_ a connection string
     m_connectionString = iConfig.getParameter<std::string>("connect");
+
+    if (!globaltag.empty()) {
+      edm::Service<edm::SiteLocalConfig> siteLocalConfig;
+      if (siteLocalConfig.isAvailable()) {
+        if (siteLocalConfig->useLocalConnectString()) {
+          std::string const& localConnectPrefix = siteLocalConfig->localConnectPrefix();
+          std::string const& localConnectSuffix = siteLocalConfig->localConnectSuffix();
+          m_connectionString = localConnectPrefix + globaltag + localConnectSuffix;
+        }
+      }
+    }
   } else if (iConfig.exists("connect"))  // default connection string
     m_connectionString = iConfig.getParameter<std::string>("connect");
 
@@ -260,7 +273,7 @@ CondDBESSource::CondDBESSource(const edm::ParameterSet& iConfig)
     if (tagSnapshotTime == boost::posix_time::time_from_string(std::string(cond::time::MAX_TIMESTAMP)))
       tagSnapshotTime = boost::posix_time::ptime();
 
-    proxy->lateInit(nsess, tag, tagSnapshotTime, it->second.recordLabel(), connStr);
+    proxy->lateInit(nsess, tag, tagSnapshotTime, it->second.recordLabel(), connStr, &m_queue, &m_mutex);
   }
 
   // one loaded expose all other tags to the Proxy!
@@ -334,6 +347,7 @@ void CondDBESSource::setIntervalFor(const EventSetupRecordKey& iKey,
                                  << iTime.eventID() << ", timestamp: " << iTime.time().value()
                                  << "; from CondDBESSource::setIntervalFor";
 
+  std::lock_guard<std::mutex> guard(m_mutex);
   m_stats.nSet++;
   //{
   // not really required, keep here for the time being

@@ -24,6 +24,7 @@
 #include "DQMServices/Core/interface/DQMOneEDAnalyzer.h"
 #include "RecoVertex/BeamSpotProducer/interface/BSTrkParameters.h"
 #include "RecoVertex/BeamSpotProducer/interface/BeamFitter.h"
+#include "CondCore/DBOutputService/interface/OnlineDBOutputService.h"
 #include <fstream>
 
 //
@@ -68,10 +69,13 @@ private:
   const double dzMin_;
   const double dzMax_;
   std::string monitorName_;
+  std::string recordName_;                  // output BeamSpotOnline Record name
   edm::EDGetTokenT<reco::BeamSpot> bsSrc_;  // beam spot
   edm::EDGetTokenT<reco::TrackCollection> tracksLabel_;
-  edm::EDGetTokenT<reco::VertexCollection> pvSrc_;  // primary vertex
-  edm::EDGetTokenT<edm::TriggerResults> hltSrc_;    //hlt collection
+  edm::EDGetTokenT<reco::VertexCollection> pvSrc_;                      // primary vertex
+  edm::EDGetTokenT<edm::TriggerResults> hltSrc_;                        //hlt collection
+  edm::Service<cond::service::OnlineDBOutputService> onlineDbService_;  // DB service
+  int DBloggerReturn_;                                                  // DB logger return value
 
   int fitNLumi_;
   int fitPVNLumi_;

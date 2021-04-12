@@ -98,10 +98,10 @@ void PixelHitMatcher::set2ndLayer(float dummyphi2minB, float dummyphi2maxB, floa
   meas2ndFLayer.thePhiMax = dummyphi2maxF;
 }
 
-void PixelHitMatcher::setES(const MagneticField *magField, const TrackerGeometry *trackerGeometry) {
-  theMagField = magField;
-  theTrackerGeometry = trackerGeometry;
-  float mass = .000511;  // electron propagation
+void PixelHitMatcher::setES(MagneticField const &magField, TrackerGeometry const &trackerGeometry) {
+  theMagField = &magField;
+  theTrackerGeometry = &trackerGeometry;
+  constexpr float mass = .000511;  // electron propagation
   prop1stLayer = std::make_unique<PropagatorWithMaterial>(oppositeToMomentum, mass, theMagField);
   prop2ndLayer = std::make_unique<PropagatorWithMaterial>(alongMomentum, mass, theMagField);
 }
@@ -134,27 +134,28 @@ std::vector<SeedWithInfo> PixelHitMatcher::operator()(const std::vector<const Tr
   std::vector<TrajectoryStateOnSurface> vTsos;
   vTsos.reserve(allSeedsSize);
 
+  std::vector<GlobalPoint> hitGpMap;
   for (const auto seeds : seedsV) {
     for (const auto &seed : *seeds) {
-      std::vector<GlobalPoint> hitGpMap;
+      hitGpMap.clear();
       if (seed.nHits() > 9) {
         edm::LogWarning("GsfElectronAlgo|UnexpectedSeed") << "We cannot deal with seeds having more than 9 hits.";
         continue;
       }
 
-      const TrajectorySeed::range &hits = seed.recHits();
+      auto const &hits = seed.recHits();
       // cache the global points
 
-      for (auto it = hits.first; it != hits.second; ++it) {
-        hitGpMap.emplace_back(it->globalPosition());
+      for (auto const &hit : hits) {
+        hitGpMap.emplace_back(hit.globalPosition());
       }
 
       //iterate on the hits
-      auto he = hits.second - 1;
-      for (auto it1 = hits.first; it1 < he; ++it1) {
+      auto he = hits.end() - 1;
+      for (auto it1 = hits.begin(); it1 < he; ++it1) {
         if (!it1->isValid())
           continue;
-        auto idx1 = std::distance(hits.first, it1);
+        auto idx1 = std::distance(hits.begin(), it1);
         const DetId id1 = it1->geographicalId();
         const GeomDet *geomdet1 = it1->det();
 
@@ -209,10 +210,10 @@ std::vector<SeedWithInfo> PixelHitMatcher::operator()(const std::vector<const Tr
         GlobalPoint vertex(vprim.x(), vprim.y(), zVertex);
         auto fts2 = trackingTools::ftsFromVertexToPoint(*theMagField, hit1Pos, vertex, energy, charge);
         // now find the matching hit
-        for (auto it2 = it1 + 1; it2 != hits.second; ++it2) {
+        for (auto it2 = it1 + 1; it2 != hits.end(); ++it2) {
           if (!it2->isValid())
             continue;
-          auto idx2 = std::distance(hits.first, it2);
+          auto idx2 = std::distance(hits.begin(), it2);
           const DetId id2 = it2->geographicalId();
           const GeomDet *geomdet2 = it2->det();
           const auto det_key = std::make_pair(geomdet2->gdetIndex(), hit1Pos);

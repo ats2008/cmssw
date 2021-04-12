@@ -25,7 +25,7 @@ namespace trklet {
 
     ~TrackletEventProcessor();
 
-    void init(const Settings* theSettings);
+    void init(Settings const& theSettings);
 
     void event(SLHCEvent& ev);
 
@@ -52,6 +52,7 @@ namespace trklet {
     Timer TETimer_;
     Timer TEDTimer_;
     Timer TRETimer_;
+    Timer TPTimer_;
     Timer TCTimer_;
     Timer TCDTimer_;
     Timer PRTimer_;

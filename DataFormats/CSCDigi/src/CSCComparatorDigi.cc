@@ -1,5 +1,5 @@
 /** \file
- * 
+ *
  *
  * \author M.Schmitt, Northwestern
  */
@@ -62,7 +62,7 @@ int CSCComparatorDigi::getTimeBin() const {
 }
 
 // This definition is consistent with the one used in
-// the function CSCCLCTData::add() in EventFilter/CSCRawToDigi
+// the function CSCComparatorData::add() in EventFilter/CSCRawToDigi
 // The halfstrip counts from 0!
 int CSCComparatorDigi::getHalfStrip() const { return (getStrip() - 1) * 2 + getComparator(); }
 
@@ -95,14 +95,13 @@ void CSCComparatorDigi::print() const {
   std::ostringstream ost;
   ost << "CSCComparatorDigi | strip " << getStrip() << " | comparator " << getComparator() << " | first time bin "
       << getTimeBin() << " | time bins on ";
-  std::vector<int> tbins = getTimeBinsOn();
-  for (unsigned int i = 0; i < tbins.size(); i++) {
-    ost << tbins[i] << " ";
-  }
+  std::copy(getTimeBinsOn().begin(), getTimeBinsOn().end(), std::ostream_iterator<int>(ost, " "));
   edm::LogVerbatim("CSCDigi") << ost.str();
 }
 
-//@@ Doesn't print all time bins
 std::ostream& operator<<(std::ostream& o, const CSCComparatorDigi& digi) {
-  return o << " " << digi.getStrip() << " " << digi.getComparator() << " " << digi.getTimeBin();
+  o << "CSCComparatorDigi Strip:" << digi.getStrip() << ", Comparator: " << digi.getComparator()
+    << ", First Time Bin On: " << digi.getTimeBin() << ", Time Bins On: ";
+  std::copy(digi.getTimeBinsOn().begin(), digi.getTimeBinsOn().end(), std::ostream_iterator<int>(o, " "));
+  return o;
 }

@@ -42,8 +42,6 @@ public:
 
   void theBaseNumber(const DDGeoHistory& gh);
 
-  std::string noNSgeoHistory(const DDGeoHistory& gh);
-
 private:
   std::string label_;
   int nNodes_;
@@ -130,8 +128,20 @@ void TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::EventSet
 
     // Actions for MTD volumes: searchg for sensitive detectors
 
+    std::stringstream ss;
+    auto print_path = [&]() {
+      ss << " - OCMS[0]/";
+      for (uint i = 1; i < fv.geoHistory().size(); i++) {
+        ss << fv.geoHistory()[i].logicalPart().name().fullname();
+        ss << "[";
+        ss << std::to_string(fv.geoHistory()[i].copyno());
+        ss << "]/";
+      }
+    };
+
     if (write && fv.geoHistory()[limit - 1].logicalPart().name().name() == ddTopNodeName_) {
-      edm::LogInfo("TestMTDPath") << " - " << noNSgeoHistory(fv.geoHistory());
+      print_path();
+      edm::LogInfo("TestMTDPath") << ss.str();
 
       bool isSens = false;
 
@@ -153,6 +163,7 @@ void TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::EventSet
         // Test of numbering scheme for sensitive detectors
         //
 
+        std::stringstream sunitt;
         std::stringstream snum;
 
         if (isBarrel) {
@@ -160,6 +171,7 @@ void TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::EventSet
           BTLDetId theId(btlNS_.getUnitID(thisN_));
           int hIndex = theId.hashedIndex(lay);
           BTLDetId theNewId(theId.getUnhashedIndex(hIndex, lay));
+          sunitt << theId.rawId();
           snum << theId;
           snum << "\n layout type = " << static_cast<int>(lay);
           snum << "\n ieta        = " << theId.ieta(lay);
@@ -184,6 +196,7 @@ void TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::EventSet
           snum << "\n";
         } else {
           ETLDetId theId(etlNS_.getUnitID(thisN_));
+          sunitt << theId.rawId();
           snum << theId;
 #ifdef EDM_ML_DEBUG
           edm::LogInfo("TestMTDNumbering")
@@ -245,7 +258,11 @@ void TestMTDIdealGeometry::analyze(const edm::Event& iEvent, const edm::EventSet
         if (std::fabs(distGlobal - distLocal) > 1.e-6) {
           spos << "DIFFERENCE IN DISTANCE \n";
         }
+        sunitt << fround(zeroGlobal.X()) << fround(zeroGlobal.Y()) << fround(zeroGlobal.Z()) << fround(cn1Global.X())
+               << fround(cn1Global.Y()) << fround(cn1Global.Z());
         edm::LogInfo("TestMTDPosition") << spos.str();
+
+        edm::LogVerbatim("MTDUnitTest") << sunitt.str();
       }
     }
     ++id;
@@ -264,22 +281,6 @@ void TestMTDIdealGeometry::theBaseNumber(const DDGeoHistory& gh) {
     edm::LogInfo("TestMTDIdealGeometry") << name << " " << copyN;
 #endif
   }
-}
-
-std::string TestMTDIdealGeometry::noNSgeoHistory(const DDGeoHistory& gh) {
-  std::string output;
-  for (uint i = 0; i < gh.size(); i++) {
-    output += gh[i].logicalPart().name().name();
-    output += "[";
-    output += std::to_string(gh[i].copyno());
-    output += "]/";
-  }
-
-#ifdef EDM_ML_DEBUG
-  edm::LogInfo("TestMTDIdealGeometry") << output;
-#endif
-
-  return output;
 }
 
 DEFINE_FWK_MODULE(TestMTDIdealGeometry);
