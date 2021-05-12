@@ -402,7 +402,7 @@ void Converter<DDLConstant>::operator()(xml_h element) const {
   DDRegistry* res = _option<DDRegistry>();
   xml_dim_t constant = element;
   xml_dim_t par = constant.parent();
-  bool eval = par.hasAttr(_U(eval)) ? par.attr<bool>(_U(eval)) : false;
+  bool eval = par.hasAttr(_U(eval)) ? par.attr<bool>(_U(eval)) : true;
   string val = constant.valueStr();
   string nam = constant.nameStr();
   string real = ns.prepend(nam);
@@ -758,7 +758,7 @@ void Converter<DDLRotationByAxis>::operator()(xml_h element) const {
   xml_dim_t xrot(element);
   xml_dim_t par(xrot.parent());
   if (xrot.hasAttr(_U(name))) {
-    string nam = xrot.nameStr();  // + string("Rotation"); // xrot.hasAttr(_U(name)) ? xrot.nameStr() : par.nameStr();
+    string nam = xrot.nameStr();
     string axis = ns.attr<string>(xrot, DD_CMU(axis));
     double angle = ns.attr<double>(xrot, _U(angle));
     Rotation3D rot;
@@ -786,7 +786,7 @@ void Converter<DDLLogicalPart>::operator()(xml_h element) const {
   xml_dim_t e(element);
   string sol = e.child(DD_CMU(rSolid)).attr<string>(_U(name));
   string mat = e.child(DD_CMU(rMaterial)).attr<string>(_U(name));
-  string volName = e.attr<string>(_U(name));
+  string volName = ns.prepend(e.attr<string>(_U(name)));
   Solid solid = ns.solid(sol);
   Material material = ns.material(mat);
 
@@ -852,8 +852,8 @@ void Converter<DDLPosPart>::operator()(xml_h element) const {
   cms::DDNamespace ns(_param<cms::DDParsingContext>());  //, element, true );
   xml_dim_t e(element);
   int copy = e.attr<int>(DD_CMU(copyNumber));
-  string parentName = ns.attr<string>(e.child(DD_CMU(rParent)), _U(name));
-  string childName = ns.attr<string>(e.child(DD_CMU(rChild)), _U(name));
+  string parentName = ns.prepend(ns.attr<string>(e.child(DD_CMU(rParent)), _U(name)));
+  string childName = ns.prepend(ns.attr<string>(e.child(DD_CMU(rChild)), _U(name)));
   Volume parent = ns.volume(parentName, false);
   Volume child = ns.volume(childName, false);
 
@@ -986,8 +986,10 @@ void Converter<Parameter>::operator()(xml_h element) const {
   string specParName = specPar.attr<string>(_U(name));
   string name = e.nameStr();
   string value = e.attr<string>(DD_CMU(value));
-  bool eval = e.hasAttr(_U(eval)) ? e.attr<bool>(_U(eval))
-                                  : (specParSect.hasAttr(_U(eval)) ? specParSect.attr<bool>(_U(eval)) : false);
+  bool eval = specParSect.hasAttr(_U(eval)) ? specParSect.attr<bool>(_U(eval)) : false;
+  eval = specPar.hasAttr(_U(eval)) ? specPar.attr<bool>(_U(eval)) : eval;
+  eval = e.hasAttr(_U(eval)) ? e.attr<bool>(_U(eval)) : eval;
+
   string type = eval ? "number" : "string";
 
 #ifdef EDM_ML_DEBUG
@@ -1003,6 +1005,10 @@ void Converter<Parameter>::operator()(xml_h element) const {
 #endif
 
   size_t idx = value.find('[');
+  if (idx == string::npos && type == "number") {
+    registry.specpars[specParName].numpars[name].emplace_back(dd4hep::_toDouble(value));
+    return;
+  }
   if (idx == string::npos || type == "string") {
     registry.specpars[specParName].spars[name].emplace_back(std::move(value));
     return;
@@ -2242,6 +2248,9 @@ static long load_dddefinition(Detector& det, xml_h element) {
       Volume mfv1 = ns.volume("MagneticFieldVolumes:MAGF", false);
       if (mfv1.isValid())
         wv.placeVolume(mfv1, 1);
+
+      // Can not deal with reflections without closed geometry
+      det.manager().CloseGeometry();
 
       det.endDocument();
     }

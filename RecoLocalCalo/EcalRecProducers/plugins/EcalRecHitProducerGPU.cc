@@ -16,6 +16,7 @@
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/ServiceRegistry/interface/Service.h"
+#include "HeterogeneousCore/CUDACore/interface/JobConfigurationGPURecord.h"
 #include "HeterogeneousCore/CUDACore/interface/ScopedContext.h"
 #include "HeterogeneousCore/CUDAServices/interface/CUDAService.h"
 #include "HeterogeneousCore/CUDAUtilities/interface/cudaCheck.h"
@@ -29,7 +30,6 @@
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalRechitChannelStatusGPU.h"
 
 #include "EcalRecHitBuilderKernels.h"
-#include "EcalRecHitParametersGPURecord.h"
 
 class EcalRecHitProducerGPU : public edm::stream::EDProducer<edm::ExternalWork> {
 public:
@@ -163,7 +163,6 @@ void EcalRecHitProducerGPU::acquire(edm::Event const& event,
 
   neb_ = ebUncalibRecHits.size;
   nee_ = eeUncalibRecHits.size;
-  // std::cout << " [EcalRecHitProducerGPU::acquire]  neb_:nee_ = " << neb_ << " : " << nee_ << std::endl;
 
   if ((neb_ > configParameters_.maxNumberHitsEB) || (nee_ > configParameters_.maxNumberHitsEE)) {
     edm::LogError("EcalRecHitProducerGPU")
@@ -186,7 +185,7 @@ void EcalRecHitProducerGPU::acquire(edm::Event const& event,
   setup.get<EcalLaserAPDPNRatiosRefRcd>().get(LaserAPDPNRatiosRefHandle_);
   setup.get<EcalLaserAlphasRcd>().get(LaserAlphasHandle_);
   setup.get<EcalLinearCorrectionsRcd>().get(LinearCorrectionsHandle_);
-  setup.get<EcalRecHitParametersGPURecord>().get(recHitParametersHandle_);
+  setup.get<JobConfigurationGPURecord>().get(recHitParametersHandle_);
 
   auto const& ADCToGeVConstantProduct = ADCToGeVConstantHandle_->getProduct(ctx.stream());
   auto const& IntercalibConstantsProduct = IntercalibConstantsHandle_->getProduct(ctx.stream());
@@ -210,12 +209,10 @@ void EcalRecHitProducerGPU::acquire(edm::Event const& event,
   ecal::rechit::ConditionsProducts conditions{ADCToGeVConstantProduct,
                                               IntercalibConstantsProduct,
                                               ChannelStatusProduct,
-                                              //
                                               LaserAPDPNRatiosProduct,
                                               LaserAPDPNRatiosRefProduct,
                                               LaserAlphasProduct,
                                               LinearCorrectionsProduct,
-                                              //
                                               IntercalibConstantsHandle_->getOffset()};
 
   // dev mem

@@ -83,10 +83,12 @@ for year in upgradeKeys:
 # setupPU() and setupPU_() operate similarly -> called in relval_steps.py *after* merging PUDataSets w/ regular steps
 # workflow() adds a concrete workflow to the list based on condition() -> called in relval_upgrade.py
 # every special workflow gets its own derived class, which must then be added to the global dict upgradeWFs
+preventReuseKeyword = 'NOREUSE'
 class UpgradeWorkflow(object):
     def __init__(self,steps,PU,suffix,offset):
         self.steps = steps
         self.PU = PU
+        self.allowReuse = True
 
         # ensure all PU steps are in normal step list
         for step in self.PU:
@@ -98,23 +100,27 @@ class UpgradeWorkflow(object):
         self.offset = offset
         if self.offset < 0.0 or self.offset > 1.0:
             raise ValueError("Special workflow offset must be between 0.0 and 1.0")
-    def getStepName(self, step):
-        stepName = step + self.suffix
+    def getStepName(self, step, extra=""):
+        stepName = step + self.suffix + extra
         return stepName
-    def getStepNamePU(self, step):
-        stepNamePU = step + 'PU' + self.suffix
+    def getStepNamePU(self, step, extra=""):
+        stepNamePU = step + 'PU' + self.suffix + extra
         return stepNamePU
     def init(self, stepDict):
         for step in self.steps:
             stepDict[self.getStepName(step)] = {}
+            if not self.allowReuse: stepDict[self.getStepName(step,preventReuseKeyword)] = {}
         for step in self.PU:
             stepDict[self.getStepNamePU(step)] = {}
+            if not self.allowReuse: stepDict[self.getStepNamePU(step,preventReuseKeyword)] = {}
     def setup(self, stepDict, k, properties):
         for step in self.steps:
             self.setup_(step, self.getStepName(step), stepDict, k, properties)
+            if not self.allowReuse: self.preventReuse(self.getStepName(step,preventReuseKeyword), stepDict, k)
     def setupPU(self, stepDict, k, properties):
         for step in self.PU:
             self.setupPU_(step, self.getStepNamePU(step), stepDict, k, properties)
+            if not self.allowReuse: self.preventReuse(self.getStepNamePU(step,preventReuseKeyword), stepDict, k)
     def setup_(self, step, stepName, stepDict, k, properties):
         pass
     def setupPU_(self, step, stepName, stepDict, k, properties):
@@ -128,6 +134,9 @@ class UpgradeWorkflow(object):
         workflows[num+self.offset] = [ fragmentTmp, stepList ]
     def condition(self, fragment, stepList, key, hasHarvest):
         return False
+    def preventReuse(self, stepName, stepDict, k):
+        if "Sim" in stepName:
+            stepDict[stepName][k] = None
 upgradeWFs = OrderedDict()
 
 class UpgradeWorkflow_baseline(UpgradeWorkflow):
@@ -350,6 +359,8 @@ upgradeWFs['PatatrackPixelOnlyCPU'] = UpgradeWorkflowPatatrack_PixelOnlyCPU(
     steps = [
         'Reco',
         'HARVEST',
+        'RecoFakeHLT',
+        'HARVESTFakeHLT',
         'RecoGlobal',
         'HARVESTGlobal',
     ],
@@ -398,6 +409,8 @@ upgradeWFs['PatatrackPixelOnlyGPU'] = UpgradeWorkflowPatatrack_PixelOnlyGPU(
     steps = [
         'Reco',
         'HARVEST',
+        'RecoFakeHLT',
+        'HARVESTFakeHLT',
         'RecoGlobal',
         'HARVESTGlobal',
     ],
@@ -447,6 +460,8 @@ upgradeWFs['PatatrackECALOnlyCPU'] = UpgradeWorkflowPatatrack_ECALOnlyCPU(
     steps = [
         'Reco',
         'HARVEST',
+        'RecoFakeHLT',
+        'HARVESTFakeHLT',
         'RecoGlobal',
         'HARVESTGlobal',
     ],
@@ -475,6 +490,8 @@ upgradeWFs['PatatrackECALOnlyGPU'] = UpgradeWorkflowPatatrack_ECALOnlyGPU(
     steps = [
         'Reco',
         'HARVEST',
+        'RecoFakeHLT',
+        'HARVESTFakeHLT',
         'RecoGlobal',
         'HARVESTGlobal',
     ],
@@ -504,6 +521,8 @@ upgradeWFs['PatatrackHCALOnlyCPU'] = UpgradeWorkflowPatatrack_HCALOnlyCPU(
     steps = [
         'Reco',
         'HARVEST',
+        'RecoFakeHLT',
+        'HARVESTFakeHLT',
         'RecoGlobal',
         'HARVESTGlobal',
     ],
@@ -532,6 +551,8 @@ upgradeWFs['PatatrackHCALOnlyGPU'] = UpgradeWorkflowPatatrack_HCALOnlyGPU(
     steps = [
         'Reco',
         'HARVEST',
+        'RecoFakeHLT',
+        'HARVESTFakeHLT',
         'RecoGlobal',
         'HARVESTGlobal',
     ],
@@ -642,6 +663,30 @@ upgradeWFs['heCollapse'] = UpgradeWorkflow_heCollapse(
     ],
     suffix = '_heCollapse',
     offset = 0.6,
+)
+
+class UpgradeWorkflow_ecalDevel(UpgradeWorkflow):
+    def setup_(self, step, stepName, stepDict, k, properties):
+        # temporarily remove trigger & downstream steps
+        mods = {'--era': stepDict[step][k]['--era']+',phase2_ecal_devel'}
+        if 'Digi' in step:
+            mods['-s'] = 'DIGI:pdigi_valid'
+        stepDict[stepName][k] = merge([mods, stepDict[step][k]])
+    def condition(self, fragment, stepList, key, hasHarvest):
+        return fragment=="TTbar_14TeV" and '2026' in key
+upgradeWFs['ecalDevel'] = UpgradeWorkflow_ecalDevel(
+    steps = [
+        'DigiTrigger',
+        'RecoGlobal',
+        'HARVESTGlobal',
+    ],
+    PU = [
+        'DigiTrigger',
+        'RecoGlobal',
+        'HARVESTGlobal',
+    ],
+    suffix = '_ecalDevel',
+    offset = 0.61,
 )
 
 class UpgradeWorkflow_0T(UpgradeWorkflow):
@@ -885,21 +930,33 @@ upgradeWFs['PMXS1S2PR'] = UpgradeWorkflowAdjustPU(
 
 class UpgradeWorkflow_DD4hep(UpgradeWorkflow):
     def setup_(self, step, stepName, stepDict, k, properties):
-        stepDict[stepName][k] = merge([{'--geometry': 'DD4hepExtended2021', '--era': 'Run3_dd4hep'}, stepDict[step][k]])
+        if 'Run3' in stepDict[step][k]['--era']:
+            stepDict[stepName][k] = merge([{'--geometry': 'DD4hepExtended2021', '--procModifiers': 'dd4hep'}, stepDict[step][k]])
+        elif 'Phase2' in stepDict[step][k]['--era']:
+            dd4hepGeom="DD4hep"
+            dd4hepGeom+=stepDict[step][k]['--geometry']
+            stepDict[stepName][k] = merge([{'--geometry' : dd4hepGeom, '--procModifiers': 'dd4hep'}, stepDict[step][k]])
     def condition(self, fragment, stepList, key, hasHarvest):
-        return (fragment=='TTbar_13' or fragment=='ZMM_13' or fragment=='SingleMuPt10') and '2021' in key
+        return ((fragment=='TTbar_13' or fragment=='ZMM_13' or fragment=='SingleMuPt10') and '2021' in key) \
+            or ((fragment=='TTbar_14TeV' or fragment=='ZMM_14' or fragment=='SingleMuPt10') and '2026' in key)
 upgradeWFs['DD4hep'] = UpgradeWorkflow_DD4hep(
     steps = [
         'GenSim',
+        'GenSimHLBeamSpot',
+        'GenSimHLBeamSpot14',
         'Digi',
+        'DigiTrigger',
         'Reco',
+        'RecoGlobal',
         'HARVEST',
+        'HARVESTGlobal',
         'ALCA',
     ],
     PU = [],
     suffix = '_DD4hep',
     offset = 0.911,
 )
+upgradeWFs['DD4hep'].allowReuse = False
 
 # check for duplicate offsets
 offsets = [specialWF.offset for specialType,specialWF in six.iteritems(upgradeWFs)]
@@ -1059,14 +1116,14 @@ upgradeProperties[2026] = {
         'Geom' : 'Extended2026D72',
         'HLTmenu': '@fake2',
         'GT' : 'auto:phase2_realistic_T21',
-        'Era' : 'Phase2C11',
+        'Era' : 'Phase2C11_etlV4',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal'],
     },
     '2026D73' : {
         'Geom' : 'Extended2026D73',
         'HLTmenu': '@fake2',
         'GT' : 'auto:phase2_realistic_T21',
-        'Era' : 'Phase2C11',
+        'Era' : 'Phase2C11_etlV4',
         'ScenToRun' : ['GenSimHLBeamSpot','DigiTrigger','RecoGlobal', 'HARVESTGlobal'],
     },
     '2026D74' : {

@@ -1,4 +1,4 @@
-#include <iostream>
+#include <cmath>
 #include <limits>
 
 #include <cuda.h>
@@ -9,6 +9,7 @@
 #include "DataFormats/EcalDigi/interface/EcalDigiCollections.h"
 #include "DataFormats/Math/interface/approx_exp.h"
 #include "DataFormats/Math/interface/approx_log.h"
+#include "FWCore/Utilities/interface/CMSUnrollLoop.h"
 
 #include "AmplitudeComputationCommonKernels.h"
 #include "AmplitudeComputationKernels.h"
@@ -17,64 +18,6 @@
 namespace ecal {
   namespace multifit {
 
-    void eigen_solve_submatrix(SampleMatrix& mat, SampleVector& invec, SampleVector& outvec, unsigned NP) {
-      using namespace Eigen;
-      switch (NP) {  // pulse matrix is always square.
-        case 10: {
-          Matrix<SampleMatrix::Scalar, 10, 10> temp = mat.topLeftCorner<10, 10>();
-          outvec.head<10>() = temp.ldlt().solve(invec.head<10>());
-          break;
-        }
-        case 9: {
-          Matrix<SampleMatrix::Scalar, 9, 9> temp = mat.topLeftCorner<9, 9>();
-          outvec.head<9>() = temp.ldlt().solve(invec.head<9>());
-          break;
-        }
-        case 8: {
-          Matrix<SampleMatrix::Scalar, 8, 8> temp = mat.topLeftCorner<8, 8>();
-          outvec.head<8>() = temp.ldlt().solve(invec.head<8>());
-          break;
-        }
-        case 7: {
-          Matrix<SampleMatrix::Scalar, 7, 7> temp = mat.topLeftCorner<7, 7>();
-          outvec.head<7>() = temp.ldlt().solve(invec.head<7>());
-          break;
-        }
-        case 6: {
-          Matrix<SampleMatrix::Scalar, 6, 6> temp = mat.topLeftCorner<6, 6>();
-          outvec.head<6>() = temp.ldlt().solve(invec.head<6>());
-          break;
-        }
-        case 5: {
-          Matrix<SampleMatrix::Scalar, 5, 5> temp = mat.topLeftCorner<5, 5>();
-          outvec.head<5>() = temp.ldlt().solve(invec.head<5>());
-          break;
-        }
-        case 4: {
-          Matrix<SampleMatrix::Scalar, 4, 4> temp = mat.topLeftCorner<4, 4>();
-          outvec.head<4>() = temp.ldlt().solve(invec.head<4>());
-          break;
-        }
-        case 3: {
-          Matrix<SampleMatrix::Scalar, 3, 3> temp = mat.topLeftCorner<3, 3>();
-          outvec.head<3>() = temp.ldlt().solve(invec.head<3>());
-          break;
-        }
-        case 2: {
-          Matrix<SampleMatrix::Scalar, 2, 2> temp = mat.topLeftCorner<2, 2>();
-          outvec.head<2>() = temp.ldlt().solve(invec.head<2>());
-          break;
-        }
-        case 1: {
-          Matrix<SampleMatrix::Scalar, 1, 1> temp = mat.topLeftCorner<1, 1>();
-          outvec.head<1>() = temp.ldlt().solve(invec.head<1>());
-          break;
-        }
-        default:
-          return;
-      }
-    }
-
     template <typename MatrixType>
     __device__ __forceinline__ bool update_covariance(EcalPulseCovariance const& pulse_covariance,
                                                       MatrixType& inverse_cov,
@@ -82,7 +25,7 @@ namespace ecal {
       constexpr int nsamples = SampleVector::RowsAtCompileTime;
       constexpr int npulses = BXVectorType::RowsAtCompileTime;
 
-#pragma unroll
+      CMS_UNROLL_LOOP
       for (unsigned int ipulse = 0; ipulse < npulses; ipulse++) {
         auto const amplitude = amplitudes.coeff(ipulse);
         if (amplitude == 0)
@@ -147,7 +90,7 @@ namespace ecal {
       DataType* shrAtAStorage = reinterpret_cast<DataType*>(shrmem) +
                                 calo::multifit::MapSymM<DataType, NPULSES>::total * (threadIdx.x + blockDim.x);
 
-      // FIXME: remove eitehr idx or ch -> they are teh same thing
+      // channel
       int idx = threadIdx.x + blockDim.x * blockIdx.x;
 
 // ref the right ptr
@@ -157,14 +100,13 @@ namespace ecal {
       ARRANGE(energies);
 #undef ARRANGE
 
-      auto const ch = idx;
       if (idx < nchannels) {
         if (static_cast<MinimizationState>(acState[idx]) == MinimizationState::Precomputed)
           return;
 
         // get the hash
-        int const inputCh = ch >= offsetForInputs ? ch - offsetForInputs : ch;
-        auto const* dids = ch >= offsetForInputs ? dids_ee : dids_eb;
+        int const inputCh = idx >= offsetForInputs ? idx - offsetForInputs : idx;
+        auto const* dids = idx >= offsetForInputs ? dids_ee : dids_eb;
         auto const did = DetId{dids[inputCh]};
         auto const isBarrel = did.subdetId() == EcalBarrel;
         auto const hashedId = isBarrel ? ecal::reconstruction::hashedIndexEB(did.rawId())
@@ -175,19 +117,20 @@ namespace ecal {
         int npassive = 0;
 
         calo::multifit::ColumnVector<NPULSES, int> pulseOffsets;
-#pragma unroll
+        CMS_UNROLL_LOOP
         for (int i = 0; i < NPULSES; ++i)
           pulseOffsets(i) = i;
 
         calo::multifit::ColumnVector<NPULSES, DataType> resultAmplitudes;
-#pragma unroll
+        CMS_UNROLL_LOOP
         for (int counter = 0; counter < NPULSES; counter++)
           resultAmplitudes(counter) = 0;
 
         // inits
         //SampleDecompLLT covariance_decomposition;
         //SampleMatrix inverse_cov;
-        SampleVector::Scalar chi2 = 0, chi2_now = 0;
+        //        SampleVector::Scalar chi2 = 0, chi2_now = 0;
+        float chi2 = 0, chi2_now = 0;
 
         // loop until ocnverge
         while (true) {
@@ -199,12 +142,12 @@ namespace ecal {
           DataType* covMatrixStorage = shrMatrixLForFnnlsStorage;
           calo::multifit::MapSymM<DataType, NSAMPLES> covMatrix{covMatrixStorage};
           int counter = 0;
-#pragma unroll
-          for (int col = 0; col < NSAMPLES; col++)
-#pragma unroll
+          CMS_UNROLL_LOOP
+          for (int col = 0; col < NSAMPLES; col++) {
+            CMS_UNROLL_LOOP
             for (int row = col; row < NSAMPLES; row++)
               covMatrixStorage[counter++] = __ldg(&noisecov[idx].coeffRef(row, col));
-
+          }
           update_covariance(pulse_covariance[hashedId], covMatrix, resultAmplitudes);
 
           // compute actual covariance decomposition
@@ -227,36 +170,36 @@ namespace ecal {
           calo::multifit::MapSymM<DataType, NPULSES> AtA{shrAtAStorage};
           //SampleMatrix AtA;
           SampleVector Atb;
-#pragma unroll
+          CMS_UNROLL_LOOP
           for (int icol = 0; icol < NPULSES; icol++) {
             float reg_ai[NSAMPLES];
 
-// load column icol
-#pragma unroll
+            // load column icol
+            CMS_UNROLL_LOOP
             for (int counter = 0; counter < NSAMPLES; counter++)
               reg_ai[counter] = A(counter, icol);
 
             // compute diagoanl
             float sum = 0.f;
-#pragma unroll
+            CMS_UNROLL_LOOP
             for (int counter = 0; counter < NSAMPLES; counter++)
               sum += reg_ai[counter] * reg_ai[counter];
 
             // store
             AtA(icol, icol) = sum;
 
-// go thru the other columns
-#pragma unroll
+            // go thru the other columns
+            CMS_UNROLL_LOOP
             for (int j = icol + 1; j < NPULSES; j++) {
               // load column j
               float reg_aj[NSAMPLES];
-#pragma unroll
+              CMS_UNROLL_LOOP
               for (int counter = 0; counter < NSAMPLES; counter++)
                 reg_aj[counter] = A(counter, j);
 
               // accum
               float sum = 0.f;
-#pragma unroll
+              CMS_UNROLL_LOOP
               for (int counter = 0; counter < NSAMPLES; counter++)
                 sum += reg_aj[counter] * reg_ai[counter];
 
@@ -267,7 +210,7 @@ namespace ecal {
 
             // Atb accum
             float sum_atb = 0.f;
-#pragma unroll
+            CMS_UNROLL_LOOP
             for (int counter = 0; counter < NSAMPLES; counter++)
               sum_atb += reg_ai[counter] * reg_b[counter];
 
@@ -291,67 +234,12 @@ namespace ecal {
                                 16,
                                 2);
 
-          {
-            DataType accum[NSAMPLES];
-// load accum
-#pragma unroll
-            for (int counter = 0; counter < NSAMPLES; counter++)
-              accum[counter] = -samples[idx](counter);
-
-            // iterate
-            for (int icol = 0; icol < NPULSES; icol++) {
-              DataType pm_col[NSAMPLES];
-
-// preload a column of pulse matrix
-#pragma unroll
-              for (int counter = 0; counter < NSAMPLES; counter++)
-                pm_col[counter] = __ldg(&pulse_matrix[idx].coeffRef(counter, icol));
-
-// accum
-#pragma unroll
-              for (int counter = 0; counter < NSAMPLES; counter++)
-                accum[counter] += resultAmplitudes[icol] * pm_col[counter];
-            }
-
-            DataType reg_L[NSAMPLES];
-            DataType accumSum = 0;
-
-// preload a column and load column 0 of cholesky
-#pragma unroll
-            for (int i = 0; i < NSAMPLES; i++)
-              reg_L[i] = matrixL(i, 0);
-
-            // compute x0 and store it
-            auto x_prev = accum[0] / reg_L[0];
-            accumSum += x_prev * x_prev;
-
-// iterate
-#pragma unroll
-            for (int iL = 1; iL < NSAMPLES; iL++) {
-// update accum
-#pragma unroll
-              for (int counter = iL; counter < NSAMPLES; counter++)
-                accum[counter] -= x_prev * reg_L[counter];
-
-// load the next column of cholesky
-#pragma unroll
-              for (int counter = iL; counter < NSAMPLES; counter++)
-                reg_L[counter] = matrixL(counter, iL);
-
-              // compute the next x for M(iL, icol)
-              x_prev = accum[iL] / reg_L[iL];
-
-              // store teh result value
-              accumSum += x_prev * x_prev;
-            }
-
-            chi2_now = accumSum;
-          }
+          calo::multifit::calculateChiSq(matrixL, pulse_matrix[idx], resultAmplitudes, samples[idx], chi2_now);
 
           auto deltachi2 = chi2_now - chi2;
           chi2 = chi2_now;
 
-          if (ecal::abs(deltachi2) < 1e-3)
+          if (std::abs(deltachi2) < 1e-3)
             break;
 
           //---- AM: TEST
@@ -364,7 +252,7 @@ namespace ecal {
         chi2s[inputCh] = chi2;
         energies[inputCh] = resultAmplitudes(5);
 
-#pragma unroll
+        CMS_UNROLL_LOOP
         for (int counter = 0; counter < NPULSES; counter++)
           amplitudes[inputCh](counter) = resultAmplitudes(counter);
       }

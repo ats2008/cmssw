@@ -4,9 +4,8 @@
 #include "CUDADataFormats/Common/interface/Product.h"
 #include "CUDADataFormats/SiPixelCluster/interface/SiPixelClustersCUDA.h"
 #include "CUDADataFormats/SiPixelDigi/interface/SiPixelDigisCUDA.h"
-#include "CUDADataFormats/TrackingRecHit/interface/TrackingRecHit2DCUDA.h"
+#include "CUDADataFormats/TrackingRecHit/interface/TrackingRecHit2DHeterogeneous.h"
 #include "DataFormats/Common/interface/Handle.h"
-#include "FWCore/Framework/interface/ESHandle.h"
 #include "FWCore/Framework/interface/Event.h"
 #include "FWCore/Framework/interface/EventSetup.h"
 #include "FWCore/Framework/interface/MakerMacros.h"
@@ -22,7 +21,7 @@
 #include "RecoLocalTracker/SiPixelRecHits/interface/PixelCPEBase.h"
 #include "RecoLocalTracker/SiPixelRecHits/interface/PixelCPEFast.h"
 
-#include "PixelRecHits.h"  // TODO : spit product from kernel
+#include "PixelRecHitGPUKernel.h"
 
 class SiPixelRecHitCUDA : public edm::global::EDProducer<> {
 public:
@@ -34,51 +33,35 @@ public:
 private:
   void produce(edm::StreamID streamID, edm::Event& iEvent, const edm::EventSetup& iSetup) const override;
 
-  // The mess with inputs will be cleaned up when migrating to the new framework
-  edm::EDGetTokenT<cms::cuda::Product<BeamSpotCUDA>> tBeamSpot;
-  edm::EDGetTokenT<cms::cuda::Product<SiPixelClustersCUDA>> token_;
-  edm::EDGetTokenT<cms::cuda::Product<SiPixelDigisCUDA>> tokenDigi_;
+  const edm::ESGetToken<PixelClusterParameterEstimator, TkPixelCPERecord> cpeToken_;
+  const edm::EDGetTokenT<cms::cuda::Product<BeamSpotCUDA>> tBeamSpot;
+  const edm::EDGetTokenT<cms::cuda::Product<SiPixelClustersCUDA>> token_;
+  const edm::EDGetTokenT<cms::cuda::Product<SiPixelDigisCUDA>> tokenDigi_;
+  const edm::EDPutTokenT<cms::cuda::Product<TrackingRecHit2DCUDA>> tokenHit_;
 
-  edm::EDPutTokenT<cms::cuda::Product<TrackingRecHit2DCUDA>> tokenHit_;
-
-  std::string cpeName_;
-
-  pixelgpudetails::PixelRecHitGPUKernel gpuAlgo_;
+  const pixelgpudetails::PixelRecHitGPUKernel gpuAlgo_;
 };
 
 SiPixelRecHitCUDA::SiPixelRecHitCUDA(const edm::ParameterSet& iConfig)
-    : tBeamSpot(consumes<cms::cuda::Product<BeamSpotCUDA>>(iConfig.getParameter<edm::InputTag>("beamSpot"))),
+    : cpeToken_(esConsumes(edm::ESInputTag("", iConfig.getParameter<std::string>("CPE")))),
+      tBeamSpot(consumes<cms::cuda::Product<BeamSpotCUDA>>(iConfig.getParameter<edm::InputTag>("beamSpot"))),
       token_(consumes<cms::cuda::Product<SiPixelClustersCUDA>>(iConfig.getParameter<edm::InputTag>("src"))),
       tokenDigi_(consumes<cms::cuda::Product<SiPixelDigisCUDA>>(iConfig.getParameter<edm::InputTag>("src"))),
-      tokenHit_(produces<cms::cuda::Product<TrackingRecHit2DCUDA>>()),
-      cpeName_(iConfig.getParameter<std::string>("CPE")) {}
+      tokenHit_(produces<cms::cuda::Product<TrackingRecHit2DCUDA>>()) {}
 
 void SiPixelRecHitCUDA::fillDescriptions(edm::ConfigurationDescriptions& descriptions) {
   edm::ParameterSetDescription desc;
 
   desc.add<edm::InputTag>("beamSpot", edm::InputTag("offlineBeamSpotCUDA"));
-  desc.add<edm::InputTag>("src", edm::InputTag("siPixelClustersCUDAPreSplitting"));
+  desc.add<edm::InputTag>("src", edm::InputTag("siPixelClustersPreSplittingCUDA"));
   desc.add<std::string>("CPE", "PixelCPEFast");
   descriptions.add("siPixelRecHitCUDA", desc);
 }
 
 void SiPixelRecHitCUDA::produce(edm::StreamID streamID, edm::Event& iEvent, const edm::EventSetup& es) const {
-  // const TrackerGeometry *geom_ = nullptr;
-  const PixelClusterParameterEstimator* cpe_ = nullptr;
-
-  /*
-  edm::ESHandle<TrackerGeometry> geom;
-  es.get<TrackerDigiGeometryRecord>().get( geom );
-  geom_ = geom.product();
-  */
-
-  edm::ESHandle<PixelClusterParameterEstimator> hCPE;
-  es.get<TkPixelCPERecord>().get(cpeName_, hCPE);
-  cpe_ = dynamic_cast<const PixelCPEBase*>(hCPE.product());
-
-  PixelCPEFast const* fcpe = dynamic_cast<const PixelCPEFast*>(cpe_);
-  if (!fcpe) {
-    throw cms::Exception("Configuration") << "too bad, not a fast cpe gpu processing not possible....";
+  PixelCPEFast const* fcpe = dynamic_cast<const PixelCPEFast*>(&es.getData(cpeToken_));
+  if (not fcpe) {
+    throw cms::Exception("Configuration") << "SiPixelRecHitSoAFromLegacy can only use a CPE of type PixelCPEFast";
   }
 
   edm::Handle<cms::cuda::Product<SiPixelClustersCUDA>> hclusters;

@@ -80,6 +80,7 @@ nanoDQM = DQMEDAnalyzer("NanoAODDQM",
                 Plot1D('jetPtRelv2', 'jetPtRelv2', 20, 0, 60, 'Relative momentum of the lepton with respect to the closest jet after subtracting the lepton'),
                 Plot1D('jetRelIso', 'jetRelIso', 20, -0.2, 1.8, 'Relative isolation in matched jet (1/ptRatio-1, pfRelIso04_all if no matched jet)'),
                 Plot1D('lostHits', 'lostHits', 4, -0.5, 3.5, 'number of missing inner hits'),
+                Plot1D('jetNDauCharged', 'jetNDauCharged', 20, -0.5, 19.5, 'number of charged daughters of the closest jet'),
                 NoPlot('mass'),
                 Plot1D('miniPFRelIso_all', 'miniPFRelIso_all', 20, 0, 1, 'mini PF relative isolation, total (with scaled rho*EA PU corrections)'),
                 Plot1D('miniPFRelIso_chg', 'miniPFRelIso_chg', 20, 0, 1, 'mini PF relative isolation, charged component'),
@@ -298,6 +299,15 @@ nanoDQM = DQMEDAnalyzer("NanoAODDQM",
                 Plot1D('statusFlags', 'statusFlags', 32768, 0, 32768, 'gen status flags stored bitwise, bits are: 0 : isPrompt, 1 : isDecayedLeptonHadron, 2 : isTauDecayProduct, 3 : isPromptTauDecayProduct, 4 : isDirectTauDecayProduct, 5 : isDirectPromptTauDecayProduct, 6 : isDirectHadronDecayProduct, 7 : isHardProcess, 8 : fromHardProcess, 9 : isHardProcessTauDecayProduct, 10 : isDirectHardProcessTauDecayProduct, 11 : fromHardProcessBeforeFSR, 12 : isFirstCopy, 13 : isLastCopy, 14 : isLastCopyBeforeFSR, '),
             )
         ),
+        GenVtx = cms.PSet(
+            sels = cms.PSet(),
+            plots = cms.VPSet(
+                Plot1D('x', 'x', 50, -0.5, 0.5, 'Gen vertex x position'),
+                Plot1D('y', 'y', 50, -0.5, 0.5, 'Gen vertex y position'),
+                Plot1D('z', 'z', 30, -15, 15, 'Gen vertex z position'),
+                Plot1D('t0', 't0', 20, -1, 1, 'Gen vertex time (t0)'),
+            )
+        ),
         GenVisTau = cms.PSet(
             sels = cms.PSet(),
             plots = cms.VPSet(
@@ -473,6 +483,7 @@ nanoDQM = DQMEDAnalyzer("NanoAODDQM",
                 Plot1D('mvaTTH', 'mvaTTH', 20, -1, 1, 'TTH MVA lepton ID score'),
                 Plot1D('nStations', 'nStations', 5, -0.5, 4.5, 'number of matched stations with default arbitration (segment & track)'),
                 Plot1D('nTrackerLayers', 'nTrackerLayers', 15, 2.5, 17.5, 'number of layers in the tracker'),
+                Plot1D('jetNDauCharged', 'jetNDauCharged', 20, -0.5, 19.5, 'number of charged daughters of the closest jet'),
                 Plot1D('pdgId', 'pdgId', 27, -13.5, 13.5, 'PDG code assigned by the event reconstruction (not by MC truth)'),
                 Plot1D('pfIsoId', 'pfIsoId', 7, -0.5, 6.5, 'PFIso ID from miniAOD selector (1=PFIsoVeryLoose, 2=PFIsoLoose, 3=PFIsoMedium, 4=PFIsoTight, 5=PFIsoVeryTight, 6=PFIsoVeryVeryTight)'),
                 Plot1D('pfRelIso03_all', 'pfRelIso03_all', 20, 0, 2, 'PF relative isolation dR=0.3, total (deltaBeta corrections)'),
@@ -623,6 +634,7 @@ nanoDQM = DQMEDAnalyzer("NanoAODDQM",
                 Plot1D('y', 'y', 20, -0.5, 0.5, 'secondary vertex Y position, in cm'),
                 Plot1D('z', 'z', 20, -10, 10, 'secondary vertex Z position, in cm'),
                 Plot1D('ntracks', 'ntracks', 11, -0.5, 10.5, 'number of tracks'),
+                Plot1D('charge', 'charge', 11 , -0.5, 10.5, 'sum of the charge of the SV tracks'),
             )
         ),
         SoftActivityJet = cms.PSet(

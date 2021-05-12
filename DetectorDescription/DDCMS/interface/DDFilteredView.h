@@ -144,6 +144,9 @@ namespace cms {
     // Name of current node
     std::string_view name() const;
 
+    // Name of current node with namespace
+    std::string_view fullName() const;
+
     // Copy number of current node
     unsigned short copyNum() const;
 
@@ -163,7 +166,7 @@ namespace cms {
     T get(const std::string&);
 
     //! extract attribute value for current Node
-    //  keep the maespace for comparison
+    //  keep the namespace for comparison
     //  assume there are no regular expressions
     template <typename T>
     std::vector<T> getValuesNS(const std::string& key) {

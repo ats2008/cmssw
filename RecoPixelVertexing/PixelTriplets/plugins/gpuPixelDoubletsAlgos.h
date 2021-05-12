@@ -7,7 +7,7 @@
 #include <cstdio>
 #include <limits>
 
-#include "CUDADataFormats/TrackingRecHit/interface/TrackingRecHit2DCUDA.h"
+#include "CUDADataFormats/TrackingRecHit/interface/TrackingRecHit2DHeterogeneous.h"
 #include "DataFormats/Math/interface/approx_atan2.h"
 #include "HeterogeneousCore/CUDAUtilities/interface/VecArray.h"
 #include "HeterogeneousCore/CUDAUtilities/interface/cuda_assert.h"
@@ -50,9 +50,9 @@ namespace gpuPixelDoublets {
 
     bool isOuterLadder = ideal_cond;
 
-    using Hist = TrackingRecHit2DSOAView::Hist;
+    using PhiBinner = TrackingRecHit2DSOAView::PhiBinner;
 
-    auto const& __restrict__ hist = hh.phiBinner();
+    auto const& __restrict__ phiBinner = hh.phiBinner();
     uint32_t const* __restrict__ offsets = hh.hitsLayerStart();
     assert(offsets);
 
@@ -93,7 +93,7 @@ namespace gpuPixelDoublets {
       uint8_t outer = layerPairs[2 * pairLayerId + 1];
       assert(outer > inner);
 
-      auto hoff = Hist::histOff(outer);
+      auto hoff = PhiBinner::histOff(outer);
 
       auto i = (0 == pairLayerId) ? j : j - innerLayerCumulativeSize[pairLayerId - 1];
       i += offsets[inner];
@@ -105,7 +105,7 @@ namespace gpuPixelDoublets {
 
       // found hit corresponding to our cuda thread, now do the job
       auto mi = hh.detectorIndex(i);
-      if (mi > 2000)
+      if (mi > gpuClustering::maxNumModules)
         continue;  // invalid
 
       /* maybe clever, not effective when zoCut is on
@@ -175,10 +175,10 @@ namespace gpuPixelDoublets {
 
       auto iphicut = phicuts[pairLayerId];
 
-      auto kl = Hist::bin(int16_t(mep - iphicut));
-      auto kh = Hist::bin(int16_t(mep + iphicut));
-      auto incr = [](auto& k) { return k = (k + 1) % Hist::nbins(); };
-      // bool piWrap = std::abs(kh-kl) > Hist::nbins()/2;
+      auto kl = PhiBinner::bin(int16_t(mep - iphicut));
+      auto kh = PhiBinner::bin(int16_t(mep + iphicut));
+      auto incr = [](auto& k) { return k = (k + 1) % PhiBinner::nbins(); };
+      // bool piWrap = std::abs(kh-kl) > PhiBinner::nbins()/2;
 
 #ifdef GPU_DEBUG
       int tot = 0;
@@ -191,17 +191,17 @@ namespace gpuPixelDoublets {
       for (auto kk = kl; kk != khh; incr(kk)) {
 #ifdef GPU_DEBUG
         if (kk != kl && kk != kh)
-          nmin += hist.size(kk + hoff);
+          nmin += phiBinner.size(kk + hoff);
 #endif
-        auto const* __restrict__ p = hist.begin(kk + hoff);
-        auto const* __restrict__ e = hist.end(kk + hoff);
+        auto const* __restrict__ p = phiBinner.begin(kk + hoff);
+        auto const* __restrict__ e = phiBinner.end(kk + hoff);
         p += first;
         for (; p < e; p += stride) {
           auto oi = __ldg(p);
           assert(oi >= offsets[outer]);
           assert(oi < offsets[outer + 1]);
           auto mo = hh.detectorIndex(oi);
-          if (mo > 2000)
+          if (mo > gpuClustering::maxNumModules)
             continue;  //    invalid
 
           if (doZ0Cut && z0cutoff(oi))

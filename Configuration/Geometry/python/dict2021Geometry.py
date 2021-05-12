@@ -314,7 +314,7 @@ trackerDict = {
             'Geometry/TrackerSimData/data/trackerProdCutsBEAM.xml',
         ],
         "sim" : [
-            'from Geometry.TrackerNumberingBuilder.trackerNumberingGeometry_cfi import *',
+            'from Geometry.TrackerNumberingBuilder.trackerNumberingGeometry_cff import *',
         ],
         "reco" : [
             'from Geometry.CommonTopologies.globalTrackingGeometry_cfi import *',
@@ -516,7 +516,7 @@ trackerDict = {
             'Geometry/TrackerSimData/data/trackerProdCutsBEAM.xml',
         ],
         "sim" : [
-            'from Geometry.TrackerNumberingBuilder.trackerNumberingGeometry_cfi import *',
+            'from Geometry.TrackerNumberingBuilder.trackerNumberingGeometry_cff import *',
         ],
         "reco" : [
             'from Geometry.CommonTopologies.globalTrackingGeometry_cfi import *',
@@ -719,7 +719,7 @@ trackerDict = {
             'Geometry/TrackerSimData/data/trackerProdCutsBEAM.xml',
         ],
         "sim" : [
-            'from Geometry.TrackerNumberingBuilder.trackerNumberingGeometry_cfi import *',
+            'from Geometry.TrackerNumberingBuilder.trackerNumberingGeometry_cff import *',
         ],
         "reco" : [
             'from Geometry.CommonTopologies.globalTrackingGeometry_cfi import *',
@@ -921,7 +921,7 @@ trackerDict = {
             'Geometry/TrackerSimData/data/trackerProdCutsBEAM.xml',
         ],
         "sim" : [
-            'from Geometry.TrackerNumberingBuilder.trackerNumberingGeometry_cfi import *',
+            'from Geometry.TrackerNumberingBuilder.trackerNumberingGeometry_cff import *',
         ],
         "reco" : [
             'from Geometry.CommonTopologies.globalTrackingGeometry_cfi import *',
@@ -1025,7 +1025,7 @@ muonDict = {
             'Geometry/MuonCommonData/data/rpcf/2015/v1/rpcf.xml',
             'Geometry/MuonCommonData/data/gemf/TDR_BaseLine/gemf.xml',
             'Geometry/MuonCommonData/data/gem11/TDR_BaseLine/gem11.xml',
-            'Geometry/MuonCommonData/data/csc/2021/v2/csc.xml',
+            'Geometry/MuonCommonData/data/csc/2021/v3/csc.xml',
             'Geometry/MuonCommonData/data/mfshield/2017/v2/mfshield.xml',
         ],
         2 : [
@@ -1069,12 +1069,12 @@ forwardDict = {
             'Geometry/ForwardCommonData/data/forwardshield/2021/v1/forwardshield.xml',
             'Geometry/ForwardCommonData/data/brmrotations.xml',
             'Geometry/ForwardCommonData/data/brm/2021/v1/brm.xml',
-            'Geometry/ForwardCommonData/data/zdcmaterials.xml',
+            'Geometry/ForwardCommonData/data/zdcmaterials/2021/v1/zdcmaterials.xml',
             'Geometry/ForwardCommonData/data/lumimaterials.xml',
             'Geometry/ForwardCommonData/data/zdcrotations.xml',
             'Geometry/ForwardCommonData/data/lumirotations.xml',
             'Geometry/ForwardCommonData/data/zdc/2021/v1/zdc.xml',
-            'Geometry/ForwardCommonData/data/zdclumi/2021/v1/zdclumi.xml',
+            'Geometry/ForwardCommonData/data/zdclumi/2021/v2/zdclumi.xml',
             'Geometry/ForwardCommonData/data/cmszdc.xml',
         ],
         3 : [

@@ -34,6 +34,7 @@ public:
             (HGCalClusteringAlgoBase::VerbosityLevel)ps.getUntrackedParameter<unsigned int>("verbosity", 3),
             reco::CaloCluster::undefined),
         thresholdW0_(ps.getParameter<std::vector<double>>("thresholdW0")),
+        positionDeltaRho2_(ps.getParameter<double>("positionDeltaRho2")),
         vecDeltas_(ps.getParameter<std::vector<double>>("deltac")),
         kappa_(ps.getParameter<double>("kappa")),
         ecut_(ps.getParameter<double>("ecut")),
@@ -45,15 +46,10 @@ public:
         maxNumberOfThickIndices_(ps.getParameter<unsigned>("maxNumberOfThickIndices")),
         fcPerMip_(ps.getParameter<std::vector<double>>("fcPerMip")),
         fcPerEle_(ps.getParameter<double>("fcPerEle")),
-        nonAgedNoises_(ps.getParameter<edm::ParameterSet>("noises").getParameter<std::vector<double>>("values")),
+        nonAgedNoises_(ps.getParameter<std::vector<double>>("noises")),
         noiseMip_(ps.getParameter<edm::ParameterSet>("noiseMip").getParameter<double>("noise_MIP")),
         use2x2_(ps.getParameter<bool>("use2x2")),
-        initialized_(false) {
-    // repeat same noises for CE-H as well
-    if (!isNose_) {
-      nonAgedNoises_.insert(std::end(nonAgedNoises_), std::begin(nonAgedNoises_), std::end(nonAgedNoises_));
-    }
-  }
+        initialized_(false) {}
 
   ~HGCalCLUEAlgoT() override {}
 
@@ -89,6 +85,7 @@ public:
 
   static void fillPSetDescription(edm::ParameterSetDescription& iDesc) {
     iDesc.add<std::vector<double>>("thresholdW0", {2.9, 2.9, 2.9});
+    iDesc.add<double>("positionDeltaRho2", 1.69);
     iDesc.add<std::vector<double>>("deltac",
                                    {
                                        1.3,
@@ -107,9 +104,7 @@ public:
     iDesc.add<unsigned>("maxNumberOfThickIndices", 6);
     iDesc.add<std::vector<double>>("fcPerMip", {});
     iDesc.add<double>("fcPerEle", 0.0);
-    edm::ParameterSetDescription descNestedNoises;
-    descNestedNoises.add<std::vector<double>>("values", {});
-    iDesc.add<edm::ParameterSetDescription>("noises", descNestedNoises);
+    iDesc.add<std::vector<double>>("noises", {});
     edm::ParameterSetDescription descNestedNoiseMIP;
     descNestedNoiseMIP.add<bool>("scaleByDose", false);
     descNestedNoiseMIP.add<unsigned int>("scaleByDoseAlgo", 0);
@@ -126,6 +121,7 @@ public:
 private:
   // To compute the cluster position
   std::vector<double> thresholdW0_;
+  const double positionDeltaRho2_;
 
   // The two parameters used to identify clusters
   std::vector<double> vecDeltas_;

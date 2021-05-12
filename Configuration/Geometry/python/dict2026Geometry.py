@@ -769,6 +769,7 @@ muonDict = {
         ],
         "sim" : [
             'from Geometry.MuonNumbering.muonGeometryConstants_cff import *',
+            'from Geometry.MuonNumbering.muonOffsetESProducer_cff import *',
         ],
         "reco" : [
             'from Geometry.MuonNumbering.muonNumberingInitialization_cfi import *',
@@ -815,6 +816,7 @@ muonDict = {
         ],
         "sim" : [
             'from Geometry.MuonNumbering.muonGeometryConstants_cff import *',
+            'from Geometry.MuonNumbering.muonOffsetESProducer_cff import *',
         ],
         "reco" : [
             'from Geometry.MuonNumbering.muonNumberingInitialization_cfi import *',
@@ -861,6 +863,7 @@ muonDict = {
         ],
         "sim" : [
             'from Geometry.MuonNumbering.muonGeometryConstants_cff import *',
+            'from Geometry.MuonNumbering.muonOffsetESProducer_cff import *',
         ],
         "reco" : [
             'from Geometry.MuonNumbering.muonNumberingInitialization_cfi import *',
@@ -907,6 +910,7 @@ muonDict = {
         ],
         "sim" : [
             'from Geometry.MuonNumbering.muonGeometryConstants_cff import *',
+            'from Geometry.MuonNumbering.muonOffsetESProducer_cff import *',
         ],
         "reco" : [
             'from Geometry.MuonNumbering.muonNumberingInitialization_cfi import *',
@@ -953,6 +957,7 @@ muonDict = {
         ],
         "sim" : [
             'from Geometry.MuonNumbering.muonGeometryConstants_cff import *',
+            'from Geometry.MuonNumbering.muonOffsetESProducer_cff import *',
         ],
         "reco" : [
             'from Geometry.MuonNumbering.muonNumberingInitialization_cfi import *',
@@ -1119,12 +1124,12 @@ timingDict = {
             'Geometry/MTDSimData/data/CrystalBarPhiFlat/mtdProdCuts.xml'
             ],
         "sim" : [
-            'from Geometry.MTDNumberingBuilder.mtdNumberingGeometry_cfi import *',
+            'from Geometry.MTDNumberingBuilder.mtdNumberingGeometry_cff import *',
         ],
         "reco" :[
             'from RecoMTD.DetLayers.mtdDetLayerGeometry_cfi import *',
-            'from Geometry.MTDGeometryBuilder.mtdParameters_cfi import *',
-            'from Geometry.MTDNumberingBuilder.mtdNumberingGeometry_cfi import *',
+            'from Geometry.MTDGeometryBuilder.mtdParameters_cff import *',
+            'from Geometry.MTDNumberingBuilder.mtdNumberingGeometry_cff import *',
             'from Geometry.MTDNumberingBuilder.mtdTopology_cfi import *',
             'from Geometry.MTDGeometryBuilder.mtdGeometry_cfi import *',
             'from Geometry.MTDGeometryBuilder.idealForDigiMTDGeometry_cff import *',
@@ -1186,7 +1191,7 @@ timingDict = {
             'from Geometry.MTDGeometryBuilder.idealForDigiMTDGeometry_cff import *',
             'mtdGeometry.applyAlignment = cms.bool(False)'
         ],
-        "era" : "phase2_timing, phase2_timing_layer",
+        "era" : "phase2_timing, phase2_timing_layer, phase2_etlV4",
     },
     "I13" : {
         1 : [
@@ -1214,7 +1219,7 @@ timingDict = {
            'from Geometry.MTDGeometryBuilder.idealForDigiMTDGeometry_cff import *',
            'mtdGeometry.applyAlignment = cms.bool(False)'
            ],
-       "era" : "phase2_timing, phase2_timing_layer",
+       "era" : "phase2_timing, phase2_timing_layer, phase2_etlV4",
     },
 }
 

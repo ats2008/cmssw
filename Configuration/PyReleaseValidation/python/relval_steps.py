@@ -459,6 +459,8 @@ steps['RunNoBPTX2018C']={'INPUT':InputInfo(dataSet='/NoBPTX/Run2018C-v1/RAW',lab
 steps['RunDisplacedJet2018C']={'INPUT':InputInfo(dataSet='/DisplacedJet/Run2018C-v1/RAW',label='2018C',events=100000,location='STD', ls=Run2018C)}
 steps['RunCharmonium2018C']={'INPUT':InputInfo(dataSet='/Charmonium/Run2018C-v1/RAW',label='2018C',events=100000,location='STD', ls=Run2018C)}
 
+steps['RunJetHT2018C_nanoULremini']={'INPUT':InputInfo(dataSet='/JetHT/Run2018C-UL2018_MiniAODv2-v1/MINIAOD',label='2018C',events=100000,location='STD', ls=Run2018C)}
+
 #### run2 2018D ####
 Run2018D={320822: [[1, 100]]}
 steps['RunHLTPhy2018D']={'INPUT':InputInfo(dataSet='/HLTPhysics/Run2018D-v1/RAW',label='2018D',events=100000,location='STD', ls=Run2018D)}
@@ -496,6 +498,7 @@ steps['RunCosmics2016B']={'INPUT':InputInfo(dataSet='/Cosmics/Run2016B-v1/RAW',l
 
 ### LS2 - MWGR ###
 steps['RunCosmics2020']={'INPUT':InputInfo(dataSet='/ExpressCosmics/Commissioning2019-Express-v1/FEVT',label='2020GR0',run=[334393],events=100000,location='STD')}
+steps['RunCosmics2020GEM']={'INPUT':InputInfo(dataSet='/ExpressCosmics/Commissioning2020-Express-v1/FEVT',label='2020GR4',run=[337973],events=100000,location='STD')}
 
 #### Test of lumi section boundary crossing with run2 2018D ####
 Run2018Dml1={320822: [[1,1]] , 320823: [[1,1]]}
@@ -669,8 +672,8 @@ baseDataSetRelease=[
     'CMSSW_10_6_0-PU25ns_106X_upgrade2018_realistic_v4_FastSim-v1',# 20 - fastSim premix library UP18
     'CMSSW_10_6_0-106X_mc2017_realistic_v3-v1',         # 21 - GEN-SIM inputs for LHE-GEN-SIM 2017 workflows
     'CMSSW_10_6_0-106X_upgrade2018_realistic_v4-v1',            # 22 - GEN-SIM inputs for LHE-GEN-SIM 2018 workflows
-    'CMSSW_11_1_0_pre5-111X_mcRun3_2021_realistic_HI_v3-v1',    #23 - Run3 HI GEN-SIM for mixing
-    'CMSSW_11_1_0_pre2-PU25ns_111X_upgrade2018_realistic_RunDep_premix_v1-v1', # 24 - 2018 Run-Dependent premix library
+    'CMSSW_11_2_0_pre8-112X_mcRun3_2021_realistic_HI_v11-v1',    #23 - Run3 HI GEN-SIM for mixing
+    'CMSSW_11_2_0_pre8-PU_112X_upgrade2018_realistic_v4-v1', # 24 - 2018 Run-Dependent premix library
     ]
 
 # note: INPUT commands to be added once GEN-SIM w/ 13TeV+PostLS1Geo will be available
@@ -963,7 +966,7 @@ U80by1={'--relval': '80,1'}
 hiAlca2011 = {'--conditions':'auto:run1_mc_hi'}
 hiAlca2015 = {'--conditions':'auto:run2_mc_hi', '--era':'Run2_HI'}
 hiAlca2017 = {'--conditions':'auto:phase1_2017_realistic', '--era':'Run2_2017_pp_on_XeXe'}
-hiAlca2018 = {'--conditions':'auto:phase1_2018_realistic', '--era':'Run2_2018'}
+hiAlca2018 = {'--conditions':'auto:phase1_2018_realistic_hi', '--era':'Run2_2018'}
 hiAlca2018_ppReco = {'--conditions':'auto:phase1_2018_realistic_hi', '--era':'Run2_2018_pp_on_AA'}
 hiAlca2021_ppReco = {'--conditions':'auto:phase1_2021_realistic_hi', '--era':'Run3_pp_on_PbPb'}
 
@@ -3179,6 +3182,7 @@ steps['NANOEDM2016_80X'] = merge([{'--era': 'Run2_2016,run2_miniAOD_80XLegacy'},
 steps['NANOEDM2018'] = merge([ {'--conditions': 'auto:run2_data', '--era': 'Run2_2018'}, stepNanoEDMData ])
 steps['NANOEDM2018_102Xv1'] = merge([ {'--era': 'Run2_2018,run2_nanoAOD_102Xv1'}, steps['NANOEDM2018'] ])
 steps['NANOEDM2018_106Xv1'] = merge([ {'--era': 'Run2_2018,run2_nanoAOD_106Xv1'}, steps['NANOEDM2018'] ])
+steps['NANOEDM2018_106Xv2'] = merge([ {'--era': 'Run2_2018,run2_nanoAOD_106Xv2'}, steps['NANOEDM2018'] ])
 
 steps['HARVESTNANOAODMC2017']=merge([{'-s':'HARVESTING:@nanoAODDQM','--conditions': 'auto:phase1_2017_realistic','--era': 'Run2_2017'},steps['HARVESTUP15']])
 steps['HARVESTNANOAODMC2017_94XMiniAODv1']=merge([{'--era': 'Run2_2017,run2_nanoAOD_94XMiniAODv1'},steps['HARVESTNANOAODMC2017']])
@@ -3194,6 +3198,7 @@ steps['HARVESTNANOAOD2016_80X']=merge([{'--era': 'Run2_2016,run2_miniAOD_80XLega
 steps['HARVESTNANOAOD2018']=merge([{'--conditions': 'auto:run2_data', '--era':'Run2_2018'}, steps['HARVESTNANOAOD2017']])
 steps['HARVESTNANOAOD2018_102Xv1']=merge([{'--era':'Run2_2018,run2_nanoAOD_102Xv1'}, steps['HARVESTNANOAOD2018']])
 steps['HARVESTNANOAOD2018_106Xv1']=merge([{'--era':'Run2_2018,run2_nanoAOD_106Xv1'}, steps['HARVESTNANOAOD2018']])
+steps['HARVESTNANOAOD2018_106Xv2']=merge([{'--era':'Run2_2018,run2_nanoAOD_106Xv2'}, steps['HARVESTNANOAOD2018']])
 
 steps['NANOMERGE'] = { '-s': 'ENDJOB', '-n': 1000 , '--eventcontent' : 'NANOAODSIM','--datatier': 'NANOAODSIM', '--conditions': 'auto:run2_mc' }
 
@@ -3236,15 +3241,15 @@ steps['NanoFullBadHcalMitig']=merge([{'--era' : 'Run2_2018,pf_badHcalMitigation'
 from  Configuration.PyReleaseValidation.upgradeWorkflowComponents import *
 
 # imported from above, only non-empty values should be provided here
-defaultDataSets['2017']='CMSSW_10_6_0-106X_mc2017_realistic_v3-v'
-defaultDataSets['2017Design']='CMSSW_10_0_0_pre2-100X_mc2017_design_IdealBS_v1-v'
-defaultDataSets['2018']='CMSSW_10_6_0-106X_upgrade2018_realistic_v4-v'
-defaultDataSets['2018Design']='CMSSW_10_6_0-106X_upgrade2018_design_v3-v'
-defaultDataSets['2021']='CMSSW_10_6_1-106X_mcRun3_2021_realistic_v1_rsb-v'
-defaultDataSets['2021Design']='CMSSW_10_6_0_pre3-105X_postLS2_realistic_v6-v'
-defaultDataSets['2023']='CMSSW_10_6_1-106X_mcRun3_2021_realistic_v1_rsb-v'
-defaultDataSets['2024']='CMSSW_10_6_1-106X_mcRun3_2021_realistic_v1_rsb-v'
-defaultDataSets['2026D49']='CMSSW_11_0_0_pre13-110X_mcRun4_realistic_v2_2026D49noPU-v'
+defaultDataSets['2017']='CMSSW_11_2_0_pre8-112X_mc2017_realistic_v3-v'
+defaultDataSets['2017Design']='CMSSW_11_2_0_pre8-112X_mc2017_design_v1-v'
+defaultDataSets['2018']='CMSSW_11_2_0_pre8-112X_upgrade2018_realistic_v4-v'
+defaultDataSets['2018Design']='CMSSW_11_2_0_pre8-112X_upgrade2018_design_v3-v'
+defaultDataSets['2021']='CMSSW_11_2_0_pre8-112X_mcRun3_2021_realistic_v10-v'
+defaultDataSets['2021Design']='CMSSW_11_2_0_pre8-112X_mcRun3_2021_design_v10-v'
+defaultDataSets['2023']='CMSSW_11_2_0_pre8-112X_mcRun3_2023_realistic_v10-v'
+defaultDataSets['2024']='CMSSW_11_2_0_pre8-112X_mcRun3_2024_realistic_v10-v'
+defaultDataSets['2026D49']='CMSSW_11_2_0_pre8-112X_mcRun4_realistic_v3_2026D49noPU-v'
 
 puDataSets = {}
 for key, value in defaultDataSets.items(): puDataSets[key+'PU'] = value
@@ -3476,7 +3481,10 @@ for step in upgradeStepDict.keys():
                         #however, there can be a conflict of beam spots but this is lost in the dataset name
                         #so please be careful
                         s=frag[:-4]+'_'+key
-                        if 'FastSim' not in k and s+'INPUT' not in steps and s in baseDataSetReleaseBetter and defaultDataSets[key] != '': # exclude upgradeKeys without input dataset
+                        # exclude upgradeKeys without input dataset, and special WFs that disable reuse
+                        istep = step+preventReuseKeyword
+                        if 'FastSim' not in k and s+'INPUT' not in steps and s in baseDataSetReleaseBetter and defaultDataSets[key] != '' and \
+                           (istep not in upgradeStepDict or key not in upgradeStepDict[istep] or upgradeStepDict[istep][key] is not None):
                             steps[k+'INPUT']={'INPUT':InputInfo(dataSet='/RelVal'+info.dataset+'/%s/GEN-SIM'%(baseDataSetReleaseBetter[s],),location='STD')}
    else:
         for key in [key for year in upgradeKeys for key in upgradeKeys[year]]:

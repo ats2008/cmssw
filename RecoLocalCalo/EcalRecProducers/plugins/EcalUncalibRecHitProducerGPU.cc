@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "CUDADataFormats/EcalRecHitSoA/interface/EcalUncalibratedRecHit.h"
 #include "CondFormats/DataRecord/interface/EcalGainRatiosRcd.h"
 #include "CondFormats/DataRecord/interface/EcalPedestalsRcd.h"
@@ -17,21 +15,21 @@
 #include "FWCore/Framework/interface/MakerMacros.h"
 #include "FWCore/Framework/interface/stream/EDProducer.h"
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
+#include "HeterogeneousCore/CUDACore/interface/JobConfigurationGPURecord.h"
 #include "HeterogeneousCore/CUDACore/interface/ScopedContext.h"
 #include "HeterogeneousCore/CUDAUtilities/interface/cudaCheck.h"
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalGainRatiosGPU.h"
+#include "RecoLocalCalo/EcalRecAlgos/interface/EcalMultifitParametersGPU.h"
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalPedestalsGPU.h"
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalPulseCovariancesGPU.h"
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalPulseShapesGPU.h"
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalSamplesCorrelationGPU.h"
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalTimeBiasCorrectionsGPU.h"
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalTimeCalibConstantsGPU.h"
-#include "RecoLocalCalo/EcalRecAlgos/interface/EcalMultifitParametersGPU.h"
 
 #include "Common.h"
 #include "DeclsForKernels.h"
-#include "EcalUncalibRecHitMultiFitAlgo_gpu_new.h"
-#include "EcalMultifitParametersGPURecord.h"
+#include "EcalUncalibRecHitMultiFitAlgoGPU.h"
 
 class EcalUncalibRecHitProducerGPU : public edm::stream::EDProducer<edm::ExternalWork> {
 public:
@@ -59,7 +57,7 @@ private:
   const edm::ESGetToken<EcalTimeCalibConstantsGPU, EcalTimeCalibConstantsRcd> timeCalibConstantsToken_;
   const edm::ESGetToken<EcalSampleMask, EcalSampleMaskRcd> sampleMaskToken_;
   const edm::ESGetToken<EcalTimeOffsetConstant, EcalTimeOffsetConstantRcd> timeOffsetConstantToken_;
-  const edm::ESGetToken<EcalMultifitParametersGPU, EcalMultifitParametersGPURecord> multifitParametersToken_;
+  const edm::ESGetToken<EcalMultifitParametersGPU, JobConfigurationGPURecord> multifitParametersToken_;
 
   // configuration parameters
   ecal::multifit::ConfigurationParameters configParameters_;
@@ -75,8 +73,8 @@ private:
 void EcalUncalibRecHitProducerGPU::fillDescriptions(edm::ConfigurationDescriptions& confDesc) {
   edm::ParameterSetDescription desc;
 
-  desc.add<edm::InputTag>("digisLabelEB", edm::InputTag("ecalRawToDigiGPU", "ebDigisGPU"));
-  desc.add<edm::InputTag>("digisLabelEE", edm::InputTag("ecalRawToDigiGPU", "eeDigisGPU"));
+  desc.add<edm::InputTag>("digisLabelEB", edm::InputTag("ecalRawToDigiGPU", "ebDigis"));
+  desc.add<edm::InputTag>("digisLabelEE", edm::InputTag("ecalRawToDigiGPU", "eeDigis"));
 
   desc.add<std::string>("recHitsLabelEB", "EcalUncalibRecHitsEB");
   desc.add<std::string>("recHitsLabelEE", "EcalUncalibRecHitsEE");
@@ -101,11 +99,9 @@ void EcalUncalibRecHitProducerGPU::fillDescriptions(edm::ConfigurationDescriptio
   desc.add<double>("amplitudeThresholdEE", 10);
   desc.add<uint32_t>("maxNumberHitsEB", 61200);
   desc.add<uint32_t>("maxNumberHitsEE", 14648);
-  desc.add<std::vector<uint32_t>>("kernelMinimizeThreads", {32, 1, 1});
-  // ---- default false or true? It was set to true, but at HLT it is false
-  desc.add<bool>("shouldRunTimingComputation", false);
-  std::string label = "ecalUncalibRecHitProducerGPU";
-  confDesc.add(label, desc);
+  desc.addUntracked<std::vector<uint32_t>>("kernelMinimizeThreads", {32, 1, 1});
+  desc.add<bool>("shouldRunTimingComputation", true);
+  confDesc.addWithDefaultLabel(desc);
 }
 
 EcalUncalibRecHitProducerGPU::EcalUncalibRecHitProducerGPU(const edm::ParameterSet& ps)
@@ -122,7 +118,7 @@ EcalUncalibRecHitProducerGPU::EcalUncalibRecHitProducerGPU(const edm::ParameterS
       timeCalibConstantsToken_{esConsumes<EcalTimeCalibConstantsGPU, EcalTimeCalibConstantsRcd>()},
       sampleMaskToken_{esConsumes<EcalSampleMask, EcalSampleMaskRcd>()},
       timeOffsetConstantToken_{esConsumes<EcalTimeOffsetConstant, EcalTimeOffsetConstantRcd>()},
-      multifitParametersToken_{esConsumes<EcalMultifitParametersGPU, EcalMultifitParametersGPURecord>()} {
+      multifitParametersToken_{esConsumes<EcalMultifitParametersGPU, JobConfigurationGPURecord>()} {
   std::pair<double, double> EBtimeFitLimits, EEtimeFitLimits;
   EBtimeFitLimits.first = ps.getParameter<double>("EBtimeFitLimits_Lower");
   EBtimeFitLimits.second = ps.getParameter<double>("EBtimeFitLimits_Upper");
@@ -153,7 +149,7 @@ EcalUncalibRecHitProducerGPU::EcalUncalibRecHitProducerGPU(const edm::ParameterS
   configParameters_.shouldRunTimingComputation = ps.getParameter<bool>("shouldRunTimingComputation");
 
   // minimize kernel launch conf
-  auto threadsMinimize = ps.getParameter<std::vector<uint32_t>>("kernelMinimizeThreads");
+  auto threadsMinimize = ps.getUntrackedParameter<std::vector<uint32_t>>("kernelMinimizeThreads");
   configParameters_.kernelMinimizeThreads[0] = threadsMinimize[0];
   configParameters_.kernelMinimizeThreads[1] = threadsMinimize[1];
   configParameters_.kernelMinimizeThreads[2] = threadsMinimize[2];

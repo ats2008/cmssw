@@ -65,8 +65,8 @@ void testDDFilteredViewGoTo::checkFilteredView() {
 
   double radLength = fview.get<double>("TrackerRadLength");
   double xi = fview.getNextValue("TrackerXi");
-  CPPUNIT_ASSERT(radLength == refRadLength_);
-  CPPUNIT_ASSERT(xi == refXi_);
+  CPPUNIT_ASSERT(abs(radLength - refRadLength_) < 10e-6);
+  CPPUNIT_ASSERT(abs(xi - refXi_) < 10e-6);
 
   std::cout << "TrackerRadLength = " << radLength << "\nTrackerXi = " << xi << "\n";
 
@@ -86,7 +86,7 @@ void testDDFilteredViewGoTo::checkFilteredView() {
   // Start with Tracker
   std::cout << "\n==== Let's go to Tracker\n";
   fview.goTo({0, 0, 6});
-  CPPUNIT_ASSERT(fview.name() == "Tracker");
+  CPPUNIT_ASSERT(fview.fullName() == "tracker:Tracker");
   printMe(fview);
 
   // Go to the first daughter

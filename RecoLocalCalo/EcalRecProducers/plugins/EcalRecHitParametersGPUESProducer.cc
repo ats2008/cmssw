@@ -1,9 +1,7 @@
 #include <array>
-#include <iostream>
 #include <tuple>
 #include <utility>
 
-#include "EcalRecHitParametersGPURecord.h"
 #include "FWCore/Framework/interface/ESProducer.h"
 #include "FWCore/Framework/interface/ESProductHost.h"
 #include "FWCore/Framework/interface/ESTransientHandle.h"
@@ -15,6 +13,7 @@
 #include "FWCore/ParameterSet/interface/ParameterSet.h"
 #include "FWCore/Utilities/interface/ReusableObjectHolder.h"
 #include "FWCore/Utilities/interface/typelookup.h"
+#include "HeterogeneousCore/CUDACore/interface/JobConfigurationGPURecord.h"
 #include "RecoLocalCalo/EcalRecAlgos/interface/EcalRecHitParametersGPU.h"
 
 class EcalRecHitParametersGPUESProducer : public edm::ESProducer, public edm::EventSetupRecordIntervalFinder {
@@ -23,7 +22,7 @@ public:
   ~EcalRecHitParametersGPUESProducer() override = default;
 
   static void fillDescriptions(edm::ConfigurationDescriptions&);
-  std::unique_ptr<EcalRecHitParametersGPU> produce(EcalRecHitParametersGPURecord const&);
+  std::unique_ptr<EcalRecHitParametersGPU> produce(JobConfigurationGPURecord const&);
 
 protected:
   void setIntervalFor(const edm::eventsetup::EventSetupRecordKey&,
@@ -31,12 +30,12 @@ protected:
                       edm::ValidityInterval&) override;
 
 private:
-  edm::ParameterSet const& pset_;
+  edm::ParameterSet const pset_;
 };
 
 EcalRecHitParametersGPUESProducer::EcalRecHitParametersGPUESProducer(edm::ParameterSet const& pset) : pset_{pset} {
   setWhatProduced(this);
-  findingRecord<EcalRecHitParametersGPURecord>();
+  findingRecord<JobConfigurationGPURecord>();
 }
 
 void EcalRecHitParametersGPUESProducer::setIntervalFor(const edm::eventsetup::EventSetupRecordKey& iKey,
@@ -77,8 +76,7 @@ void EcalRecHitParametersGPUESProducer::fillDescriptions(edm::ConfigurationDescr
   desc.addWithDefaultLabel(d);
 }
 
-std::unique_ptr<EcalRecHitParametersGPU> EcalRecHitParametersGPUESProducer::produce(
-    EcalRecHitParametersGPURecord const&) {
+std::unique_ptr<EcalRecHitParametersGPU> EcalRecHitParametersGPUESProducer::produce(JobConfigurationGPURecord const&) {
   return std::make_unique<EcalRecHitParametersGPU>(pset_);
 }
 

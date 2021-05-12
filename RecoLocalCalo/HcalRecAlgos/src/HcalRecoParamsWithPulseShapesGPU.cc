@@ -46,29 +46,29 @@ HcalRecoParamsWithPulseShapesGPU::HcalRecoParamsWithPulseShapesGPU(HcalRecoParam
       ids_[i] = newId;
 
       // resize value arrays
-      acc25nsVec_.resize(acc25nsVec_.size() + HcalConst::maxPSshapeBin);
-      diff25nsItvlVec_.resize(diff25nsItvlVec_.size() + HcalConst::maxPSshapeBin);
-      accVarLenIdxMinusOneVec_.resize(accVarLenIdxMinusOneVec_.size() + HcalConst::nsPerBX);
-      diffVarItvlIdxMinusOneVec_.resize(diffVarItvlIdxMinusOneVec_.size() + HcalConst::nsPerBX);
-      accVarLenIdxZEROVec_.resize(accVarLenIdxZEROVec_.size() + HcalConst::nsPerBX);
-      diffVarItvlIdxZEROVec_.resize(diffVarItvlIdxZEROVec_.size() + HcalConst::nsPerBX);
+      acc25nsVec_.resize(acc25nsVec_.size() + hcal::constants::maxPSshapeBin);
+      diff25nsItvlVec_.resize(diff25nsItvlVec_.size() + hcal::constants::maxPSshapeBin);
+      accVarLenIdxMinusOneVec_.resize(accVarLenIdxMinusOneVec_.size() + hcal::constants::nsPerBX);
+      diffVarItvlIdxMinusOneVec_.resize(diffVarItvlIdxMinusOneVec_.size() + hcal::constants::nsPerBX);
+      accVarLenIdxZEROVec_.resize(accVarLenIdxZEROVec_.size() + hcal::constants::nsPerBX);
+      diffVarItvlIdxZEROVec_.resize(diffVarItvlIdxZEROVec_.size() + hcal::constants::nsPerBX);
 
       // precompute and get values from the functor
       auto const& pulseShape = pulseShapes.getShape(pulseShapeId);
-      FitterFuncs::PulseShapeFunctor functor{pulseShape, false, false, false, 1, 0, 0, 10};
-      auto const offset256 = newId * HcalConst::maxPSshapeBin;
-      auto const offset25 = newId * HcalConst::nsPerBX;
+      FitterFuncs::PulseShapeFunctor functor{pulseShape, false, false, false, 1, 0, 0, hcal::constants::maxSamples};
+      auto const offset256 = newId * hcal::constants::maxPSshapeBin;
+      auto const offset25 = newId * hcal::constants::nsPerBX;
       auto const numShapes = newId;
-      for (int i = 0; i < HcalConst::maxPSshapeBin; i++) {
-        acc25nsVec_[offset256 * numShapes + i] = functor.get_acc25nsVec()[i];
-        diff25nsItvlVec_[offset256 * numShapes + i] = functor.get_diff25nsItvlVec()[i];
+      for (int i = 0; i < hcal::constants::maxPSshapeBin; i++) {
+        acc25nsVec_[offset256 * numShapes + i] = functor.acc25nsVec()[i];
+        diff25nsItvlVec_[offset256 * numShapes + i] = functor.diff25nsItvlVec()[i];
       }
 
-      for (int i = 0; i < HcalConst::nsPerBX; i++) {
-        accVarLenIdxMinusOneVec_[offset25 * numShapes + i] = functor.get_accVarLenIdxMinusOneVec()[i];
-        diffVarItvlIdxMinusOneVec_[offset25 * numShapes + i] = functor.get_diffVarItvlIdxMinusOneVec()[i];
-        accVarLenIdxZEROVec_[offset25 * numShapes + i] = functor.get_accVarLenIdxZEROVec()[i];
-        diffVarItvlIdxZEROVec_[offset25 * numShapes + i] = functor.get_diffVarItvlIdxZEROVec()[i];
+      for (int i = 0; i < hcal::constants::nsPerBX; i++) {
+        accVarLenIdxMinusOneVec_[offset25 * numShapes + i] = functor.accVarLenIdxMinusOneVec()[i];
+        diffVarItvlIdxMinusOneVec_[offset25 * numShapes + i] = functor.diffVarItvlIdxMinusOneVec()[i];
+        accVarLenIdxZEROVec_[offset25 * numShapes + i] = functor.accVarLenIdxZEROVec()[i];
+        diffVarItvlIdxZEROVec_[offset25 * numShapes + i] = functor.diffVarItvlIdxZEROVec()[i];
       }
     } else {
       // already recorded this pulse shape, just set id
@@ -104,29 +104,29 @@ HcalRecoParamsWithPulseShapesGPU::HcalRecoParamsWithPulseShapesGPU(HcalRecoParam
       ids_[i + offset] = newId;
 
       // resize value arrays
-      acc25nsVec_.resize(acc25nsVec_.size() + HcalConst::maxPSshapeBin);
-      diff25nsItvlVec_.resize(diff25nsItvlVec_.size() + HcalConst::maxPSshapeBin);
-      accVarLenIdxMinusOneVec_.resize(accVarLenIdxMinusOneVec_.size() + HcalConst::nsPerBX);
-      diffVarItvlIdxMinusOneVec_.resize(diffVarItvlIdxMinusOneVec_.size() + HcalConst::nsPerBX);
-      accVarLenIdxZEROVec_.resize(accVarLenIdxZEROVec_.size() + HcalConst::nsPerBX);
-      diffVarItvlIdxZEROVec_.resize(diffVarItvlIdxZEROVec_.size() + HcalConst::nsPerBX);
+      acc25nsVec_.resize(acc25nsVec_.size() + hcal::constants::maxPSshapeBin);
+      diff25nsItvlVec_.resize(diff25nsItvlVec_.size() + hcal::constants::maxPSshapeBin);
+      accVarLenIdxMinusOneVec_.resize(accVarLenIdxMinusOneVec_.size() + hcal::constants::nsPerBX);
+      diffVarItvlIdxMinusOneVec_.resize(diffVarItvlIdxMinusOneVec_.size() + hcal::constants::nsPerBX);
+      accVarLenIdxZEROVec_.resize(accVarLenIdxZEROVec_.size() + hcal::constants::nsPerBX);
+      diffVarItvlIdxZEROVec_.resize(diffVarItvlIdxZEROVec_.size() + hcal::constants::nsPerBX);
 
       // precompute and get values from the functor
       auto const& pulseShape = pulseShapes.getShape(pulseShapeId);
-      FitterFuncs::PulseShapeFunctor functor{pulseShape, false, false, false, 1, 0, 0, 10};
-      auto const offset256 = newId * HcalConst::maxPSshapeBin;
-      auto const offset25 = newId * HcalConst::nsPerBX;
+      FitterFuncs::PulseShapeFunctor functor{pulseShape, false, false, false, 1, 0, 0, hcal::constants::maxSamples};
+      auto const offset256 = newId * hcal::constants::maxPSshapeBin;
+      auto const offset25 = newId * hcal::constants::nsPerBX;
       auto const numShapes = newId;
-      for (int i = 0; i < HcalConst::maxPSshapeBin; i++) {
-        acc25nsVec_[offset256 * numShapes + i] = functor.get_acc25nsVec()[i];
-        diff25nsItvlVec_[offset256 * numShapes + i] = functor.get_diff25nsItvlVec()[i];
+      for (int i = 0; i < hcal::constants::maxPSshapeBin; i++) {
+        acc25nsVec_[offset256 * numShapes + i] = functor.acc25nsVec()[i];
+        diff25nsItvlVec_[offset256 * numShapes + i] = functor.diff25nsItvlVec()[i];
       }
 
-      for (int i = 0; i < HcalConst::nsPerBX; i++) {
-        accVarLenIdxMinusOneVec_[offset25 * numShapes + i] = functor.get_accVarLenIdxMinusOneVec()[i];
-        diffVarItvlIdxMinusOneVec_[offset25 * numShapes + i] = functor.get_diffVarItvlIdxMinusOneVec()[i];
-        accVarLenIdxZEROVec_[offset25 * numShapes + i] = functor.get_accVarLenIdxZEROVec()[i];
-        diffVarItvlIdxZEROVec_[offset25 * numShapes + i] = functor.get_diffVarItvlIdxZEROVec()[i];
+      for (int i = 0; i < hcal::constants::nsPerBX; i++) {
+        accVarLenIdxMinusOneVec_[offset25 * numShapes + i] = functor.accVarLenIdxMinusOneVec()[i];
+        diffVarItvlIdxMinusOneVec_[offset25 * numShapes + i] = functor.diffVarItvlIdxMinusOneVec()[i];
+        accVarLenIdxZEROVec_[offset25 * numShapes + i] = functor.accVarLenIdxZEROVec()[i];
+        diffVarItvlIdxZEROVec_[offset25 * numShapes + i] = functor.diffVarItvlIdxZEROVec()[i];
       }
     } else {
       // already recorded this pulse shape, just set id

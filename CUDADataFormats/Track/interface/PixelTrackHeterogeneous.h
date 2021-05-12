@@ -16,7 +16,7 @@ public:
   static constexpr int32_t stride() { return S; }
 
   using Quality = trackQuality::Quality;
-  using hindex_type = uint16_t;
+  using hindex_type = uint32_t;
   using HitContainer = cms::cuda::OneToManyAssoc<hindex_type, S, 5 * S>;
 
   // Always check quality is at least loose!
@@ -57,8 +57,10 @@ public:
 namespace pixelTrack {
 
 #ifdef GPU_SMALL_EVENTS
+  // kept for testing and debugging
   constexpr uint32_t maxNumber() { return 2 * 1024; }
 #else
+  // tested on MC events with 55-75 pileup events
   constexpr uint32_t maxNumber() { return 32 * 1024; }
 #endif
 
