@@ -42,7 +42,7 @@ caloStage2Params = L1Trigger.L1TCalorimeter.caloParams_cfi.caloParams.clone(
     # LUT = tight
     egIsoLUTFile               = "L1Trigger/L1TCalorimeter/data/EG_Iso_LUT_Flat_WP_v2_1358_20p0_0p7_40p0_v1_APR23.txt",
     # LUT 2 = loose
-    egIsoLUTFile2              = "L1Trigger/L1TCalorimeter/data/EG_Iso_LUT_Flat_WP_v2_608_10p0_0p7_35p0_v1_APR23.txt",
+    egIsoLUTFile2              = "L1Trigger/L1TCalorimeter/data/EG_Iso_LUT_Flat_WP_v2_524_10p0_0p3_35p0_v1_APR23.txt",
 
     #egIsoAreaNrTowersEta       = 2
     #egIsoAreaNrTowersPhi       = 4
