@@ -1,3 +1,4 @@
+#define DEV_EMU
 #include "L1Trigger/Phase2L1ParticleFlow/interface/puppi/linpuppi_ref.h"
 #include "L1Trigger/Phase2L1ParticleFlow/interface/puppi/linpuppi_bits.h"
 #include <cmath>
@@ -617,6 +618,9 @@ void l1ct::LinPuppiEmulator::run(const PFInputRegion &in,
               pvs.front().hwZ0.to_int());
   }
   if (std::abs(in.region.floatEtaCenter()) < 2.5) {  // within tracker
+    #ifdef DEV_EMU
+        std::cout<<"RUNNING THE Traker PUPPI"  <<"\n";
+    #endif
     std::vector<PuppiObjEmu> outallch, outallne_nocut, outallne, outselne;
     linpuppi_chs_ref(in.region, pvs, out.pfcharged, outallch);
     linpuppi_ref(in.region, in.track, pvs, out.pfneutral, outallne_nocut, outallne, outselne);
@@ -636,6 +640,9 @@ void l1ct::LinPuppiEmulator::run(const PFInputRegion &in,
       out.puppi.pop_back();
     out.puppi.shrink_to_fit();
   } else {  // forward
+    #ifdef DEV_EMU
+        std::cout<<"RUNNING THE FW PUPPI"  <<"\n";
+    #endif
     std::vector<PuppiObjEmu> outallne_nocut, outallne;
     fwdlinpuppi_ref(in.region, in.hadcalo, outallne_nocut, outallne, out.puppi);
   }
