@@ -445,8 +445,8 @@ l1tLayer1HF = cms.EDProducer("L1TCorrelatorLayer1Producer",
     ),
     puAlgoParameters = cms.PSet(
         nTrack = cms.uint32(0), # unused
-        nIn = cms.uint32(18), 
-        nOut = cms.uint32(18), 
+        nIn = cms.uint32(16), 
+        nOut = cms.uint32(8), 
         nVtx = cms.uint32(1),
         nFinalSort = cms.uint32(10), # to be tuned
         finalSortAlgo = cms.string("Insertion"),
