@@ -252,10 +252,11 @@ hgcalNoTKOutputTM18WriterConfig = _hgcalWriterTM18.clone(
 ## HF configuration (to be better defined later)
 #####################################################################################################################
 ## HF configuration not realistic, 3 links per endcap, write out the layer 1 outputs for now
+
 _hfWriterOutputOnly = cms.PSet(
     partition = cms.string("HF"),
-    tmuxFactor = cms.uint32(6),
-    outputLinksPuppi = cms.vuint32(*range(3)),
+    tmuxFactor = cms.uint32(1),
+    outputLinksPuppi = cms.vuint32(*range(6)),
     nOutputFramesPerBX = cms.uint32(9),
     fileFormat = cms.string("EMPv2"),
     outputFileExtension = cms.string("txt.gz"),
@@ -264,7 +265,7 @@ _hfWriterOutputOnly = cms.PSet(
 )
 hfWriterConfigs = [
     _hfWriterOutputOnly.clone(
-        outputRegions = cms.vuint32(*[9*ie+i for i in range(9)]),
+        outputRegions = cms.vuint32(*[6*ie+i for i in range(6)]),
         outputFileName = cms.string("l1HF%s-outputs" % ("Pos" if ie else "Neg")),
     ) for ie in range(2)
 ]

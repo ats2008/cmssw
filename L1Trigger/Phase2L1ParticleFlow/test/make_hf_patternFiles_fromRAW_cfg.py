@@ -34,8 +34,8 @@ process.source = cms.Source("PoolSource",
 process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(4))
 process.options = cms.untracked.PSet( 
         wantSummary = cms.untracked.bool(True),
-        #numberOfThreads = cms.untracked.uint32(4),
-        #numberOfStreams = cms.untracked.uint32(4),
+        numberOfThreads = cms.untracked.uint32(1),
+        numberOfStreams = cms.untracked.uint32(1),
 )
 
 process.PFInputsTask = cms.Task(
@@ -50,11 +50,73 @@ process.p=cms.Path(
 
 from L1Trigger.Phase2L1ParticleFlow.l1ctLayer1_patternWriters_cff import *
 process.l1tLayer1HF.patternWriters = cms.untracked.VPSet(*hfWriterConfigs)
-
 process.l1tLayer1HF.puAlgoParameters.debug = True 
+## Calo sector defenition
+#process.l1tLayer1HF.caloSectors.clear()
+#process.l1tLayer1HF.caloSectors.append(
+#        cms.PSet(
+#            etaBoundaries = cms.vdouble(-5.5, -3.0),
+#            phiSlices = cms.uint32(6),
+#            phiZero = cms.double(  3.141592653589793/18  )  # offset of first wedge in HF geometry is -10 degree
+#        ))
+#
+#process.l1tLayer1HF.caloSectors.append(
+#        cms.PSet(
+#            etaBoundaries = cms.vdouble(3.0, 5.5),
+#            phiSlices = cms.uint32(6),
+#            phiZero = cms.double(  3.141592653589793/18 ) ,
+#            phiExtra = cms.double( 3.141592653589793*2/18  )
+#        )
+#    )
+## regionizer defenition 
+#process.l1tLayer1HF.regions= cms.VPSet(
+#        cms.PSet( 
+#            etaBoundaries = cms.vdouble(-5.5, -3.0),
+#            phiSlices     = cms.uint32(6),
+#            phiZero = cms.double(  3.141592653589793/18  ), # offset of first wedge in HF geometry  is -10 degree
+#            etaExtra = cms.double(0.25),
+#            phiExtra = cms.double( 3.141592653589793*2/18  ) # dPhi = 0.34 , motivation from Ak4 jet radius [ also strict cutoff of 0.3 in current puppi implementation ] 
+#        ),
+#        cms.PSet( 
+#            etaBoundaries = cms.vdouble(+3.0, +5.5),
+#            phiSlices     = cms.uint32(6),
+#            phiZero = cms.double(  3.141592653589793/18  ), # offset of first wedge in HF geometry  is -10 degree
+#            etaExtra = cms.double(0.25),
+#            phiExtra = cms.double( 3.141592653589793*2/18  ) # dPhi = 0.34 , motivation from Ak4 jet radius [ also strict cutoff of 0.3 in current puppi implementation ] 
+#        )
+#    )
+# updting the ptter file writer
+#process.l1tLayer1HF.patternWriters = cms.untracked.VPSet(
+#        cms.PSet(
+#            eventsPerFile = cms.uint32(12),
+#            fileFormat = cms.string('EMPv2'),
+#            maxLinesPerOutputFile = cms.uint32(1024),
+#            nOutputFramesPerBX = cms.uint32(9),
+#            outputFileExtension = cms.string('txt.gz'),
+#            outputFileName = cms.string('l1HFNeg-outputs'),
+#            outputLinksPuppi = cms.vuint32(0,1, 2,3,4,5),
+#            outputRegions = cms.vuint32(
+#                0, 1, 2, 3, 4, 5
+#            ),
+#            partition = cms.string('HF'),
+#            tmuxFactor = cms.uint32(1)
+#        ),
+#        cms.PSet(
+#            eventsPerFile = cms.uint32(12),
+#            fileFormat = cms.string('EMPv2'),
+#            maxLinesPerOutputFile = cms.uint32(1024),
+#            nOutputFramesPerBX = cms.uint32(9),
+#            outputFileExtension = cms.string('txt.gz'),
+#            outputFileName = cms.string('l1HFPos-outputs'),
+#            outputLinksPuppi = cms.vuint32(0, 1, 2, 3, 4, 5),
+#            outputRegions = cms.vuint32(
+#                6, 7, 8, 9, 10, 11
+#            ),
+#            partition = cms.string('HF'),
+#            tmuxFactor = cms.uint32(1)
+#        )
+#    )
 
 
 process.p.associate(process.PFInputsTask)
-
 process.schedule = cms.Schedule([process.p])
-

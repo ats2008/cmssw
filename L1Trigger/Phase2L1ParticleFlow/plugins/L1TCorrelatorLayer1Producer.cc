@@ -1,3 +1,4 @@
+#define DEV_EMU
 // system include files
 #include <memory>
 #include <algorithm>
@@ -411,7 +412,6 @@ void L1TCorrelatorLayer1Producer::produce(edm::Event &iEvent, const edm::EventSe
         addHadCalo(calo, l1t::PFClusterRef(caloHandle, ic));
     }
   }
-
   regionizer_->run(event_.decoded, event_.pfinputs);
 
   // First, get a copy of the discretized and corrected inputs, and write them out
@@ -541,7 +541,6 @@ void L1TCorrelatorLayer1Producer::produce(edm::Event &iEvent, const edm::EventSe
   for (auto &writer : patternWriters_) {
     writer->write(event_);
   }
-
   // finally clear the regions
   event_.clear();
 }
@@ -581,7 +580,13 @@ void L1TCorrelatorLayer1Producer::initSectorsAndRegions(const edm::ParameterSet 
       if (etaWidth > 2 * l1ct::Scales::maxAbsEta())
         throw cms::Exception("Configuration", "caloSectors eta range too large for eta_t data type");
       for (unsigned int iphi = 0; iphi < phiSlices; ++iphi) {
+        
+
         float phiCenter = reco::reduceRange(iphi * phiWidth + phiZero);
+         #ifdef DEV_EMU
+             std::cout<<" > Adding the calo sector : eta_min,eta_max : "<<etaBoundaries[ieta]<<" , "<< etaBoundaries[ieta + 1]
+                      <<" |  phiCenter  : " << phiCenter <<" phi width : "<<phiWidth<<"\n";
+         #endif
         event_.decoded.hadcalo.emplace_back(etaBoundaries[ieta], etaBoundaries[ieta + 1], phiCenter, phiWidth);
         event_.decoded.emcalo.emplace_back(etaBoundaries[ieta], etaBoundaries[ieta + 1], phiCenter, phiWidth);
         event_.raw.hgcalcluster.emplace_back(etaBoundaries[ieta], etaBoundaries[ieta + 1], phiCenter, phiWidth);
@@ -600,10 +605,16 @@ void L1TCorrelatorLayer1Producer::initSectorsAndRegions(const edm::ParameterSet 
     unsigned int phiSlices = preg.getParameter<uint32_t>("phiSlices");
     float etaExtra = preg.getParameter<double>("etaExtra");
     float phiExtra = preg.getParameter<double>("phiExtra");
+    float phiZero = preg.getParameter<double>("phiZero");
     float phiWidth = 2 * M_PI / phiSlices;
-    for (unsigned int ieta = 0, neta = etaBoundaries.size() - 1; ieta < neta; ++ieta) {
       for (unsigned int iphi = 0; iphi < phiSlices; ++iphi) {
-        float phiCenter = reco::reduceRange(iphi * phiWidth);  //align with L1 TrackFinder phi sector indexing
+        float phiCenter = reco::reduceRange(iphi * phiWidth + phiZero);  //align with L1 TrackFinder phi sector indexing
+    for (unsigned int ieta = 0, neta = etaBoundaries.size() - 1; ieta < neta; ++ieta) {
+    #ifdef DEV_EMU
+        std::cout<<" > Adding the region : eta_min,eta_max: "<<etaBoundaries[ieta]<<" , "<< etaBoundaries[ieta + 1]
+                 <<" |  phiCenter  : " << phiCenter
+                 <<" | phiWidth, etaExtra, phiExtra : "<<phiWidth<<" , "<<etaExtra<<" , "<<phiExtra<<"\n"; 
+    #endif
         event_.pfinputs.emplace_back(
             etaBoundaries[ieta], etaBoundaries[ieta + 1], phiCenter, phiWidth, etaExtra, phiExtra);
       }

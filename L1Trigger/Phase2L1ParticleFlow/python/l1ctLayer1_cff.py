@@ -123,6 +123,7 @@ l1tLayer1Barrel = cms.EDProducer("L1TCorrelatorLayer1Producer",
         cms.PSet( 
             etaBoundaries = cms.vdouble(-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5),
             phiSlices     = cms.uint32(9),
+            phiZero       = cms.double(0),
             etaExtra = cms.double(0.25),
             phiExtra = cms.double(0.25),
         ),
@@ -281,11 +282,13 @@ l1tLayer1HGCal = cms.EDProducer("L1TCorrelatorLayer1Producer",
         cms.PSet( 
             etaBoundaries = cms.vdouble(-2.5, -1.5),
             phiSlices     = cms.uint32(9),
+            phiZero       = cms.double(0),
             etaExtra = cms.double(0.25),
             phiExtra = cms.double(0.25),
         ),
         cms.PSet( 
             etaBoundaries = cms.vdouble(+1.5, +2.5),
+            phiZero       = cms.double(0),
             phiSlices     = cms.uint32(9),
             etaExtra = cms.double(0.25),
             phiExtra = cms.double(0.25),
@@ -393,12 +396,14 @@ l1tLayer1HGCalNoTK = cms.EDProducer("L1TCorrelatorLayer1Producer",
         cms.PSet( 
             etaBoundaries = cms.vdouble(-3.0, -2.5),
             phiSlices     = cms.uint32(9),
+            phiZero       = cms.double(0),
             etaExtra = cms.double(0.25),
             phiExtra = cms.double(0.25),
         ),
         cms.PSet( 
             etaBoundaries = cms.vdouble(+2.5, +3.0),
             phiSlices     = cms.uint32(9),
+            phiZero       = cms.double(0),
             etaExtra = cms.double(0.25),
             phiExtra = cms.double(0.25),
         )
@@ -474,27 +479,30 @@ l1tLayer1HF = cms.EDProducer("L1TCorrelatorLayer1Producer",
     caloSectors = cms.VPSet(
         cms.PSet( 
             etaBoundaries = cms.vdouble(-5.5, -3.0),
-            phiSlices     = cms.uint32(9),
-            phiZero       = cms.double(0),
+            phiSlices     = cms.uint32(6),
+            phiZero = cms.double(  3.141592653589793/18  )  # offset of first wedge in HF geometry is -10 degree
         ),
         cms.PSet( 
             etaBoundaries = cms.vdouble(+3.0, +5.5),
-            phiSlices     = cms.uint32(9),
-            phiZero       = cms.double(0),
+            phiSlices     = cms.uint32(6),
+            phiZero = cms.double(  3.141592653589793/18  )  # offset of first wedge in HF geometry is -10 degree
         )
     ),
     regions = cms.VPSet(
         cms.PSet( 
             etaBoundaries = cms.vdouble(-5.5, -3.0),
-            phiSlices     = cms.uint32(9),
+            phiSlices     = cms.uint32(6),
+            phiZero = cms.double(  3.141592653589793/18  ), # offset of first wedge in HF geometry  is -10 degree
             etaExtra = cms.double(0.25),
-            phiExtra = cms.double(0.25),
+            phiExtra = cms.double( 3.141592653589793*2/18  ) # dPhi = 0.34 , motivation from Ak4 jet radius [ also strict cutoff of 0.3 in current puppi implementation ] 
+
         ),
         cms.PSet( 
             etaBoundaries = cms.vdouble(+3.0, +5.5),
-            phiSlices     = cms.uint32(9),
+            phiSlices     = cms.uint32(6),
+            phiZero = cms.double(  3.141592653589793/18  ), # offset of first wedge in HF geometry  is -10 degree
             etaExtra = cms.double(0.25),
-            phiExtra = cms.double(0.25),
+            phiExtra = cms.double( 3.141592653589793*2/18  ) # dPhi = 0.34 , motivation from Ak4 jet radius [ also strict cutoff of 0.3 in current puppi implementation ] 
         )
     ),
     boards=cms.VPSet(),
