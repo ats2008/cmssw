@@ -1,3 +1,4 @@
+#define DEV_EMU
 #include "L1Trigger/Phase2L1ParticleFlow/interface/L1TCorrelatorLayer1PatternFileWriter.h"
 #include "FWCore/Utilities/interface/Exception.h"
 #include <iostream>
@@ -63,6 +64,35 @@ L1TCorrelatorLayer1PatternFileWriter::L1TCorrelatorLayer1PatternFileWriter(const
       gttLatency_ = iConfig.getParameter<uint32_t>("gttLatency");
       gttNumberOfPVs_ = iConfig.getParameter<uint32_t>("gttNumberOfPVs");
       channelSpecsInput_["gtt"] = l1t::demo::ChannelSpec{tmuxFactor_ * gttTimeslices_, 1, gttLatency_};
+    }
+    if (partition_ == Partition::HF) {
+
+         #ifdef DEV_EMU
+             std::cout<<" > HF Partition activated for the inputs ! \n";
+         #endif
+
+      auto sectorConfig = iConfig.getParameter<std::vector<edm::ParameterSet>>("gctSectors");
+      if (sectorConfig.size() != 6)
+        throw cms::Exception("Configuration", "Bad number of GCT sectors");
+      //for (unsigned int iS = 0; iS < gctSectors_; ++iS) {
+      for (unsigned int iS = 0; iS < 6; ++iS) {
+        auto linksHad = sectorConfig[iS].getParameter<std::vector<int32_t>>("gctLinksHad");
+        //if (linksHad.size() != gctLinksHad_)
+        if (linksHad.size() != 1)
+          throw cms::Exception("Configuration", "Bad number of GCT links");
+        unsigned int iLink = 0;
+        //for (unsigned int i = 0; i < gctLinksHad_; ++i, ++iLink) {
+        for (unsigned int i = 0; i < 1; ++i, ++iLink) {
+          if (linksHad[i] != -1){
+         #ifdef DEV_EMU
+             std::cout<<"    > Adding link : "<<iLink + 10 * iS<<" for sector : "<<iS <<" ! \n";
+         #endif
+
+                channelIdsInput_[l1t::demo::LinkId{"gctHF", iLink + 10 * iS}].push_back(linksHad[i]);
+            }
+        }
+        channelSpecsInput_["gctHF"] = {tmuxFactor_ * gctTimeslices_, 0};
+      }
     }
     inputFileWriter_ =
         std::make_unique<l1t::demo::BoardDataWriter>(l1t::demo::parseFileFormat(fileFormat_),
@@ -130,6 +160,9 @@ void L1TCorrelatorLayer1PatternFileWriter::write(const l1ct::Event& event) {
     }
     if (partition_ == Partition::Barrel || partition_ == Partition::HGCal) {
       writeGTT(event, inputs);
+    }
+    if (partition_ == Partition::HF ) {
+      writeHFGCT(event, inputs);
     }
     inputFileWriter_->addEvent(inputs);
   }
@@ -305,6 +338,41 @@ void L1TCorrelatorLayer1PatternFileWriter::writeBarrelGCT(const l1ct::Event& eve
     }
   }
 }
+
+
+void L1TCorrelatorLayer1PatternFileWriter::writeHFGCT(const l1ct::Event& event, l1t::demo::EventData& out) {
+  std::vector<ap_uint<64>> ret;
+         #ifdef DEV_EMU
+             std::cout<<" > Writing HF inputs ! \n";
+         #endif
+
+  //for (unsigned int iS = 0; iS < gctSectors_; ++iS) {
+  for (unsigned int iS = 0; iS < 6; ++iS) {
+    l1t::demo::LinkId key0{"gctHF", iS * 10};
+    if (channelIdsInput_.count(key0) == 0)
+      continue;
+    const auto& had = event.decoded.hadcalo[iS];
+    unsigned int iLink = 0, nHad = had.size();
+         #ifdef DEV_EMU
+             std::cout<<"    >  Extracting the sector :"<<iS<<" with nHad : "<<nHad<<"  ! \n";
+         #endif
+    for (unsigned int i = 0; i < 1 ; ++i, ++iLink) {
+      ret.clear();
+      for (unsigned int iHad = i; iHad < nHad; iHad += gctLinksHad_) {
+        ret.emplace_back(had[iHad].pack());
+         #ifdef DEV_EMU
+             std::cout<<"      >  Adding had calo  : "<<iHad<<" with patter :  "<<had[iHad].pack()<<"  ! \n";
+             std::cout<<"          et / eta / phi :  "<<had[iHad]<<" with patter :  "<<had[iHad].pack()<<"  ! \n";
+         #endif
+      }
+      if (ret.empty())
+        ret.emplace_back(0);
+      out.add(l1t::demo::LinkId{"gctHF", iS * 10 + iLink}, ret);
+    }
+  }
+}
+
+
 
 void L1TCorrelatorLayer1PatternFileWriter::writeGMT(const l1ct::Event& event, l1t::demo::EventData& out) {
   l1t::demo::LinkId key{"gmt", 0};

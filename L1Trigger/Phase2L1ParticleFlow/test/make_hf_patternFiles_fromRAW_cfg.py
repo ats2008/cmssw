@@ -31,7 +31,7 @@ process.source = cms.Source("PoolSource",
         'drop l1tTrackerMuons_*_*_*'
     ),
 )
-process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(4))
+process.maxEvents = cms.untracked.PSet( input = cms.untracked.int32(2))
 process.options = cms.untracked.PSet( 
         wantSummary = cms.untracked.bool(True),
         numberOfThreads = cms.untracked.uint32(1),

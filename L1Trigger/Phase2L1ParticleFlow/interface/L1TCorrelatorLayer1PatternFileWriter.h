@@ -67,6 +67,7 @@ private:
 
   void writeTF(const l1ct::Event& event, l1t::demo::EventData& out);
   void writeBarrelGCT(const l1ct::Event& event, l1t::demo::EventData& out);
+  void writeHFGCT(const l1ct::Event& event, l1t::demo::EventData& out);
   void writeHGC(const l1ct::Event& event, l1t::demo::EventData& out);
   void writeGMT(const l1ct::Event& event, l1t::demo::EventData& out);
   void writeGTT(const l1ct::Event& event, l1t::demo::EventData& out);

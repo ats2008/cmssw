@@ -257,16 +257,24 @@ _hfWriterOutputOnly = cms.PSet(
     partition = cms.string("HF"),
     tmuxFactor = cms.uint32(1),
     outputLinksPuppi = cms.vuint32(*range(6)),
+    nInputFramesPerBX = cms.uint32(9),
+    maxLinesPerInputFile = cms.uint32(1024),
     nOutputFramesPerBX = cms.uint32(9),
-    fileFormat = cms.string("EMPv2"),
+    fileFormat = cms.string("APx"),
     outputFileExtension = cms.string("txt.gz"),
     maxLinesPerOutputFile = cms.uint32(1024),
-    eventsPerFile = cms.uint32(_eventsPerFile),
+    #eventsPerFile = cms.uint32(_eventsPerFile),
+    eventsPerFile = cms.uint32(2)
 )
 hfWriterConfigs = [
     _hfWriterOutputOnly.clone(
         outputRegions = cms.vuint32(*[6*ie+i for i in range(6)]),
         outputFileName = cms.string("l1HF%s-outputs" % ("Pos" if ie else "Neg")),
+        inputFileName  = cms.string("l1HF%s-inputs" % ("Pos" if ie else "Neg")),
+        inputFileExtension = cms.string("txt.gz"),
+        gctSectors = cms.VPSet(*[cms.PSet(
+        gctLinksHad = cms.vint32(s)
+        ) for s in range(6)]),
     ) for ie in range(2)
 ]
 

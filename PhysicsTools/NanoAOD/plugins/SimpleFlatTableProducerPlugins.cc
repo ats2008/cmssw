@@ -3,6 +3,10 @@
 #include "DataFormats/Candidate/interface/Candidate.h"
 typedef SimpleFlatTableProducer<reco::Candidate> SimpleCandidateFlatTableProducer;
 
+#include "DataFormats/L1TCalorimeter/interface/CaloCluster.h"
+typedef SimpleFlatTableProducer<l1t::CaloCluster> SimpleCandidateL1TClusterFlatTableProducer;
+
+
 #include "SimDataFormats/GeneratorProducts/interface/GenEventInfoProduct.h"
 typedef EventSingletonSimpleFlatTableProducer<GenEventInfoProduct> SimpleGenEventFlatTableProducer;
 
@@ -26,6 +30,7 @@ typedef EventSingletonSimpleFlatTableProducer<reco::BeamSpot> SimpleBeamspotFlat
 
 #include "FWCore/Framework/interface/MakerMacros.h"
 DEFINE_FWK_MODULE(SimpleCandidateFlatTableProducer);
+DEFINE_FWK_MODULE(SimpleCandidateL1TClusterFlatTableProducer);
 DEFINE_FWK_MODULE(SimpleGenEventFlatTableProducer);
 DEFINE_FWK_MODULE(SimpleGenFilterFlatTableProducerLumi);
 DEFINE_FWK_MODULE(SimpleHTXSFlatTableProducer);
