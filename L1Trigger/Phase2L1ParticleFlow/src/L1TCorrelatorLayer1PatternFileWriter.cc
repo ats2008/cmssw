@@ -362,7 +362,8 @@ void L1TCorrelatorLayer1PatternFileWriter::writeHFGCT(const l1ct::Event& event, 
         ret.emplace_back(had[iHad].pack());
          #ifdef DEV_EMU
              std::cout<<"      >  Adding had calo  : "<<iHad<<" with patter :  "<<had[iHad].pack()<<"  ! \n";
-             std::cout<<"          et / eta / phi :  "<<had[iHad]<<" with patter :  "<<had[iHad].pack()<<"  ! \n";
+             std::cout<<"          * int   : et / eta / phi :  "<<had[iHad].intPt()<<" / "<<had[iHad].intEta()<<" / "<<had[iHad].intPhi()<<"  ! \n";
+             std::cout<<"          * float : et / eta / phi :  "<<had[iHad].floatPt()<<" / "<<had[iHad].floatEta()<<" / "<<had[iHad].floatPhi()<<"  ! \n";
          #endif
       }
       if (ret.empty())
