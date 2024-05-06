@@ -272,9 +272,10 @@ hfWriterConfigs = [
         outputFileName = cms.string("l1HF%s-outputs" % ("Pos" if ie else "Neg")),
         inputFileName  = cms.string("l1HF%s-inputs" % ("Pos" if ie else "Neg")),
         inputFileExtension = cms.string("txt.gz"),
+        inputSectors = cms.vuint32(*[6*ie+i for i in range(6)]),
         gctSectors = cms.VPSet(*[cms.PSet(
         gctLinksHad = cms.vint32(s)
-        ) for s in range(6)]),
+        ) for s in range(6) ] ),
     ) for ie in range(2)
 ]
 

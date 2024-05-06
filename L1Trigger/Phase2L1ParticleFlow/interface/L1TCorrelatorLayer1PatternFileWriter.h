@@ -35,7 +35,7 @@ private:
   uint32_t gttNumberOfPVs_;
   uint32_t gttLatency_;
 
-  std::vector<uint32_t> outputRegions_, outputLinksPuppi_;
+  std::vector<uint32_t> outputRegions_, outputLinksPuppi_,inputSectors_;
   unsigned int nPuppiFramesPerRegion_;
   int32_t outputBoard_, outputLinkEgamma_;
   uint32_t nEgammaObjectsOut_;

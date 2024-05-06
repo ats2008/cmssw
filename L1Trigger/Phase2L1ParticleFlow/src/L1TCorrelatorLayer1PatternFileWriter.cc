@@ -72,6 +72,7 @@ L1TCorrelatorLayer1PatternFileWriter::L1TCorrelatorLayer1PatternFileWriter(const
          #endif
 
       auto sectorConfig = iConfig.getParameter<std::vector<edm::ParameterSet>>("gctSectors");
+      inputSectors_ = iConfig.getParameter<std::vector<uint32_t>>("inputSectors");
       if (sectorConfig.size() != 6)
         throw cms::Exception("Configuration", "Bad number of GCT sectors");
       //for (unsigned int iS = 0; iS < gctSectors_; ++iS) {
@@ -343,7 +344,7 @@ void L1TCorrelatorLayer1PatternFileWriter::writeBarrelGCT(const l1ct::Event& eve
 void L1TCorrelatorLayer1PatternFileWriter::writeHFGCT(const l1ct::Event& event, l1t::demo::EventData& out) {
   std::vector<ap_uint<64>> ret;
          #ifdef DEV_EMU
-             std::cout<<" > Writing HF inputs ! \n";
+             std::cout<<" > Writing HF inputs ! n(event.decoded.hadcalo) "<<event.decoded.hadcalo.size()<<"  \n";
          #endif
 
   //for (unsigned int iS = 0; iS < gctSectors_; ++iS) {
@@ -351,14 +352,14 @@ void L1TCorrelatorLayer1PatternFileWriter::writeHFGCT(const l1ct::Event& event, 
     l1t::demo::LinkId key0{"gctHF", iS * 10};
     if (channelIdsInput_.count(key0) == 0)
       continue;
-    const auto& had = event.decoded.hadcalo[iS];
+    const auto& had = event.decoded.hadcalo[inputSectors_[iS]];
     unsigned int iLink = 0, nHad = had.size();
          #ifdef DEV_EMU
-             std::cout<<"    >  Extracting the sector :"<<iS<<" with nHad : "<<nHad<<"  ! \n";
+             std::cout<<"    >  Extracting the sector :"<<iS<<" :: "<<inputSectors_[iS]<<" with nHad : "<<nHad<<"  ! \n";
          #endif
     for (unsigned int i = 0; i < 1 ; ++i, ++iLink) {
       ret.clear();
-      for (unsigned int iHad = i; iHad < nHad; iHad += gctLinksHad_) {
+      for (unsigned int iHad = i; iHad < nHad; iHad += 1) {
         ret.emplace_back(had[iHad].pack());
          #ifdef DEV_EMU
              std::cout<<"      >  Adding had calo  : "<<iHad<<" with patter :  "<<had[iHad].pack()<<"  ! \n";
