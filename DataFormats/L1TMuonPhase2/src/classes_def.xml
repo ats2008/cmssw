@@ -23,5 +23,9 @@
  <class name="std::vector<l1t::SAMuon>"/>
  <class name="edm::Wrapper<std::vector<l1t::SAMuon > >"/>
  <class name="edm::Ref<l1t::SAMuonCollection>" splitLevel="0"/>
+ <class name="l1Scouting::Muon"/>
+ <class name="std::vector<l1Scouting::Muon>" />
+ <class name="OrbitCollection<l1Scouting::Muon>" />
+ <class name="edm::Wrapper<OrbitCollection<l1Scouting::Muon>>" />
  </selection>
 </lcgdict>
