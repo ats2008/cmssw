@@ -85,16 +85,29 @@ std::unique_ptr<OrbitCollection<T>> ScPhase2MuonRawToDigi::unpackObj(const SDSRa
   for (auto &fedId : fedIDs_) {
     const FEDRawData &src = feds.FEDData(fedId);
     std::cout<<"  Doing for FED : "<<fedId<<"  of size : "<<src.size()<<"\n";
-    const uint32_t *begin = reinterpret_cast<const uint32_t *>(src.data());
-    const uint32_t *end = reinterpret_cast<const uint32_t *>(src.data() + src.size());
+    /*
+    const uint64_t *begin = reinterpret_cast<const uint64_t *>(src.data());
+    const uint64_t *end = reinterpret_cast<const uint64_t *>(src.data() + src.size());
     for (auto p = begin; p != end;) {
       if ((*p) == 0)
         continue;
       unsigned int bx = ((*p) >> 12) & 0xFFF;
       unsigned int nwords = (*p) & 0xFFF;
-      unsigned int nMuons = 2*nwords/3;
-    std::cout<<"    > for NMuons "<<nMuons<<"  from "<<nwords<<"\n";
+      std::cout<<" bx = "<<bx<<" | "<<"nwords : "<<nwords<<"\n";
       ++p;
+    */
+    const uint32_t *begin = reinterpret_cast<const uint32_t *>(src.data());
+    const uint32_t *end = reinterpret_cast<const uint32_t *>(src.data() + src.size());
+    for ( auto p = begin; p != end; p+=2) {
+      const uint64_t *pH = reinterpret_cast<const uint64_t *>(p) ;
+      if ((*pH) == 0)
+        continue;
+      unsigned int bx = ((*pH) >> 12) & 0xFFF;
+      unsigned int nwords = (*pH) & 0xFFF;
+      unsigned int nMuons = 2*nwords/3;
+      std::cout<<"    > for NMuons "<<nMuons<<"  from "<<nwords<<" words |  bx = "<<bx<<"\n";
+      std::cout<<"\n\n";
+      ++p;++p;
       assert(bx < OrbitCollection<T>::NBX);
       std::vector<T> &outputBuffer = buffer[bx + 1];
       outputBuffer.reserve(nwords);
@@ -114,9 +127,13 @@ std::unique_ptr<OrbitCollection<T>> ScPhase2MuonRawToDigi::unpackObj(const SDSRa
                 whi = *(p+2);
 
           }
+        if( (wlo==0) and (whi==0)) continue;
         unpackFromRaw(wlo,whi, outputBuffer);
+        //std::cout<<"         wlo and whi  : "<<wlo<<"  , "<<whi<<"\n";
         ntot++;
       }
+      
+      if((nMuons%2)==1) ++p;
     }
   }
   return std::make_unique<OrbitCollection<T>>(buffer, ntot);
