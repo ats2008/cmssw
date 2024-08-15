@@ -98,25 +98,26 @@ std::unique_ptr<OrbitCollection<T>> ScPhase2MuonRawToDigi::unpackObj(const SDSRa
     */
     const uint32_t *begin = reinterpret_cast<const uint32_t *>(src.data());
     const uint32_t *end = reinterpret_cast<const uint32_t *>(src.data() + src.size());
-    for ( auto p = begin; p != end; p+=2) {
+    for ( auto p = begin; p != end; p+=2 /* read as 64bit words*/) {
+      // reading the first  word as 64-bit header ( in the simple-client it says 24-bytes, but i cant completly understand how the 3x64 bits of header are read even in the puppi unpacker )   
       const uint64_t *pH = reinterpret_cast<const uint64_t *>(p) ;
       if ((*pH) == 0)
         continue;
       unsigned int bx = ((*pH) >> 12) & 0xFFF;
       unsigned int nwords = (*pH) & 0xFFF;
-      unsigned int nMuons = 2*nwords/3;
+      unsigned int nMuons = 2*nwords/3;  // tocount for the 96-bit muon words
       std::cout<<"    > for NMuons "<<nMuons<<"  from "<<nwords<<" words |  bx = "<<bx<<"\n";
       std::cout<<"\n\n";
       ++p;++p;
-      assert(bx < OrbitCollection<T>::NBX);
+      assert(bx < OrbitCollection<T>::NBX);   // asser fail --> unpacked wrong !
       std::vector<T> &outputBuffer = buffer[bx + 1];
       outputBuffer.reserve(nwords);
       
       uint64_t wlo;
       uint32_t whi;
 
-      for (unsigned int i = 0; i < nMuons; ++i,p += 3) {
-          if( i & 1  )
+      for (unsigned int i = 0; i < nMuons; ++i,p += 3 /* jumping 96bits*/) {
+          if( (i & 1)==1  )  // ODD Muons
           {
                 wlo = *reinterpret_cast<const uint64_t *>(p+1) ;
                 whi = *p;
@@ -133,9 +134,9 @@ std::unique_ptr<OrbitCollection<T>> ScPhase2MuonRawToDigi::unpackObj(const SDSRa
         ntot++;
       }
       
-      if((nMuons%2)==1) ++p;
+      if((nMuons%2)==1) ++p; // offset to align to the next 64 bit word
     }
-  }
+   }
   return std::make_unique<OrbitCollection<T>>(buffer, ntot);
 }
 /*
