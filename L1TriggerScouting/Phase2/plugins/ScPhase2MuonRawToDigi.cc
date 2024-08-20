@@ -67,9 +67,6 @@ void ScPhase2MuonRawToDigi::produce(edm::Event &iEvent, const edm::EventSetup &i
   edm::Handle<SDSRawDataCollection> scoutingRawDataCollection;
   iEvent.getByToken(rawToken_, scoutingRawDataCollection);
 
-  if (doCandidate_) {
-    //iEvent.put(unpackObj(*scoutingRawDataCollection, candBuffer_));
-  }
   if (doStruct_) {
     iEvent.put(unpackObj(*scoutingRawDataCollection, structBuffer_));
   }
@@ -84,8 +81,6 @@ std::unique_ptr<OrbitCollection<T>> ScPhase2MuonRawToDigi::unpackObj(const SDSRa
   unsigned int ntot = 0;
   for (auto &fedId : fedIDs_) {
     const FEDRawData &src = feds.FEDData(fedId);
-    std::cout<<"  Doing for FED : "<<fedId<<"  of size : "<<src.size()<<"\n";
-    /*
     const uint64_t *begin = reinterpret_cast<const uint64_t *>(src.data());
     const uint64_t *end = reinterpret_cast<const uint64_t *>(src.data() + src.size());
     for (auto p = begin; p != end;) {
@@ -93,22 +88,9 @@ std::unique_ptr<OrbitCollection<T>> ScPhase2MuonRawToDigi::unpackObj(const SDSRa
         continue;
       unsigned int bx = ((*p) >> 12) & 0xFFF;
       unsigned int nwords = (*p) & 0xFFF;
-      std::cout<<" bx = "<<bx<<" | "<<"nwords : "<<nwords<<"\n";
-      ++p;
-    */
-    const uint32_t *begin = reinterpret_cast<const uint32_t *>(src.data());
-    const uint32_t *end = reinterpret_cast<const uint32_t *>(src.data() + src.size());
-    for ( auto p = begin; p != end; p+=2 /* read as 64bit words*/) {
-      // reading the first  word as 64-bit header ( in the simple-client it says 24-bytes, but i cant completly understand how the 3x64 bits of header are read even in the puppi unpacker )   
-      const uint64_t *pH = reinterpret_cast<const uint64_t *>(p) ;
-      if ((*pH) == 0)
-        continue;
-      unsigned int bx = ((*pH) >> 12) & 0xFFF;
-      unsigned int nwords = (*pH) & 0xFFF;
       unsigned int nMuons = 2*nwords/3;  // tocount for the 96-bit muon words
-      std::cout<<"    > for NMuons "<<nMuons<<"  from "<<nwords<<" words |  bx = "<<bx<<"\n";
-      std::cout<<"\n\n";
-      ++p;++p;
+      ++p;
+
       assert(bx < OrbitCollection<T>::NBX);   // asser fail --> unpacked wrong !
       std::vector<T> &outputBuffer = buffer[bx + 1];
       outputBuffer.reserve(nwords);
@@ -116,67 +98,28 @@ std::unique_ptr<OrbitCollection<T>> ScPhase2MuonRawToDigi::unpackObj(const SDSRa
       uint64_t wlo;
       uint32_t whi;
 
-      for (unsigned int i = 0; i < nMuons; ++i,p += 3 /* jumping 96bits*/) {
+      const uint32_t *pMu = reinterpret_cast<const uint32_t *>(p) ;
+      for (unsigned int i = 0; i < nMuons; ++i,pMu += 3 /* jumping 96bits*/) {
           if( (i & 1)==1  )  // ODD Muons
           {
-                wlo = *reinterpret_cast<const uint64_t *>(p+1) ;
-                whi = *p;
+                wlo = *reinterpret_cast<const uint64_t *>(pMu+1) ;
+                whi = *pMu;
           }
           else
           {
-                wlo = *reinterpret_cast<const uint64_t *>(p) ;
-                whi = *(p+2);
+                wlo = *reinterpret_cast<const uint64_t *>(pMu) ;
+                whi = *(pMu+2);
 
           }
         if( (wlo==0) and (whi==0)) continue;
         unpackFromRaw(wlo,whi, outputBuffer);
-        //std::cout<<"         wlo and whi  : "<<wlo<<"  , "<<whi<<"\n";
         ntot++;
       }
-      
-      if((nMuons%2)==1) ++p; // offset to align to the next 64 bit word
+      p+=nwords;
     }
    }
   return std::make_unique<OrbitCollection<T>>(buffer, ntot);
 }
-/*
-void ScPhase2MuonRawToDigi::unpackFromRaw(uint64_t wlo, uint32_t whi, std::vector<l1t::PFCandidate> &outBuffer) {
-  float pt, eta, phi, mass, z0 = 0, dxy = 0, puppiw = 1;
-  uint16_t hwPt, hwMuonW = 1 << 8;
-  int16_t pdgId, hwEta, hwPhi, hwZ0 = 0;
-  int8_t hwDxy = 0;
-  uint8_t pid, hwQuality;
-  l1t::PFCandidate::ParticleType type;
-  int charge;
-  l1puppiUnpack::readshared(data, pt, eta, phi);
-  l1puppiUnpack::readshared(data, hwPt, hwEta, hwPhi);
-  pid = (data >> 37) & 0x7;
-  l1puppiUnpack::assignpdgid(pid, pdgId);
-  l1puppiUnpack::assignCMSSWPFCandidateId(pid, type);
-  l1puppiUnpack::assignmass(pid, mass);
-  l1puppiUnpack::assigncharge(pid, charge);
-  reco::Particle::PolarLorentzVector p4(pt, eta, phi, mass);
-  if (pid > 1) {
-    l1puppiUnpack::readcharged(data, z0, dxy, hwQuality);
-    l1puppiUnpack::readcharged(data, hwZ0, hwDxy, hwQuality);
-  } else {
-    l1puppiUnpack::readneutral(data, puppiw, hwQuality);
-    l1puppiUnpack::readneutral(data, hwMuonW, hwQuality);
-  }
-  outBuffer.emplace_back(type, charge, p4, puppiw, hwPt, hwEta, hwPhi);
-  if (pid > 1) {
-    outBuffer.back().setZ0(z0);
-    outBuffer.back().setDxy(dxy);
-    outBuffer.back().setHwZ0(hwZ0);
-    outBuffer.back().setHwDxy(hwDxy);
-    outBuffer.back().setHwTkQuality(hwQuality);
-  } else {
-    outBuffer.back().setHwMuonWeight(hwMuonW);
-    outBuffer.back().setHwEmID(hwQuality);
-  }
-  outBuffer.back().setEncodedMuon64(data);
-}
-*/
 
 void ScPhase2MuonRawToDigi::unpackFromRaw(uint64_t wlo, uint32_t whi ,std::vector<l1Scouting::Muon> &outBuffer) {
   float pt, eta, phi, z0 = 0, d0 = 0,beta;
@@ -192,9 +135,10 @@ void ScPhase2MuonRawToDigi::unpackFromRaw(uint64_t wlo, uint32_t whi ,std::vecto
   isolation = l1puppiUnpack::extractBitsFromW<9, 4>(whi);
   beta      = l1puppiUnpack::extractBitsFromW<13, 4>(whi) * 0.06f;
   charge    = (whi & 1) ? -1 : +1;
-  
   outBuffer.emplace_back(pt, eta, phi,  z0, d0,charge,quality,beta,isolation);
 }
+
+
 /*
 std::unique_ptr<l1Scouting::MuonSOA> ScPhase2MuonRawToDigi::unpackSOA(const SDSRawDataCollection &feds) {
   std::vector<std::pair<const uint64_t *, const uint64_t *>> buffers;
