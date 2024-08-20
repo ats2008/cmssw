@@ -77,9 +77,9 @@ void ScMuonToOrbitFlatTable::produce(edm::StreamID, edm::Event& iEvent, edm::Eve
   out->addColumn<float>("phi", phi, "phi (natural units)");
   out->addColumn<float>("z0", z0, "z0 (cm)");
   out->addColumn<float>("d0", d0, "d0 (cm)");
-  out->addColumn<int32_t>("charge", quality, "charge (+1/-1)");
-  out->addColumn<uint8_t>("isolation", quality, "isolation (8 bits");
-  out->addColumn<uint8_t>("quality", quality, "quality (8 bits");
+  out->addColumn<int32_t>("charge", charge, "charge (+1/-1)");
+  out->addColumn<uint8_t>("isolation", isolation, "isolation (8 bits");
+  out->addColumn<uint8_t>("quality",quality, "quality (8 bits");
   iEvent.put(std::move(out));
 }
 
