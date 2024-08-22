@@ -96,9 +96,9 @@ void ScPhase2MuonDiMuDemo::produce(edm::Event &iEvent, const edm::EventSetup &iS
 
 void ScPhase2MuonDiMuDemo::endStream() {
   if (doStruct_)
-    std::cout << "Struct analysis: " << countStruct_ << " -> " << passStruct_ << std::endl;
+    std::cout << "DiMuon | Struct analysis : " << countStruct_ << " -> " << passStruct_ << std::endl;
   if (doSOA_)
-    std::cout << "SOA analysis: " << countSOA_ << " -> " << passSOA_ << std::endl;
+    std::cout << "DiMuon | SOA analysis    : " << countSOA_    << " -> " << passSOA_    << std::endl;
 }
 
 template <typename T>
