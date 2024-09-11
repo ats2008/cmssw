@@ -58,7 +58,7 @@ options.register ('numFwkStreams',
                   VarParsing.VarParsing.varType.int,          # string, int, or float
                   "Number of CMSSW streams")
 
-options.register ('puppiMode',
+options.register ('mode',
                   'simple', # default value
                   VarParsing.VarParsing.multiplicity.singleton,
                   VarParsing.VarParsing.varType.string,          # string, int, or float
@@ -75,15 +75,15 @@ options.register ('outFile',
                   VarParsing.VarParsing.multiplicity.singleton,
                   VarParsing.VarParsing.varType.string,
                   "Sub lumisection number to process")
-options.register ('doTkMuons',
+options.register ('doTkTrackerMuons',
                   1, # default value
                   VarParsing.VarParsing.multiplicity.singleton,
                   VarParsing.VarParsing.varType.bool,          # string, int, or float
-                  "Process tkMuon paths")
+                  "Process tkTrackerMuon paths")
 
 
 options.parseArguments()
-if options.puppiMode not in ("simple", "sparse", "struct", "sparseStruct", "soa", "all", "fast"):
+if options.mode not in ("simple", "sparse", "struct", "sparseStruct", "soa", "all", "fast"):
     raise RuntimeError("Unsupported puppiMode %r" %options.puppiMode)
 
 cmsswbase = os.path.expandvars("$CMSSW_BASE/")
@@ -182,24 +182,24 @@ process.scPhase2PuppiStructToTable = cms.EDProducer("ScPuppiToOrbitFlatTable",
     doc = cms.string("L1Puppi candidates from Correlator Layer 2"),
 )
 
-scPhase2MuonRawToDigi = cms.EDProducer('ScPhase2MuonRawToDigi',
+scPhase2TrackerMuonRawToDigi = cms.EDProducer('ScPhase2TrackerMuonRawToDigi',
   src = cms.InputTag('rawDataCollector'),
   fedIDs = cms.vuint32(0),
   runCandidateUnpacker = cms.bool(False),
   runStructUnpacker = cms.bool(False),
   runSOAUnpacker = cms.bool(False),
 )
-process.scPhase2MuonRawToDigiStruct = scPhase2MuonRawToDigi.clone(
+process.scPhase2TrackerMuonRawToDigiStruct = scPhase2TrackerMuonRawToDigi.clone(
     fedIDs = cms.vuint32(1),
     runStructUnpacker = True
 )
-process.scPhase2MuonStructToTable = cms.EDProducer("ScMuonToOrbitFlatTable",
-    src = cms.InputTag("scPhase2MuonRawToDigiStruct"),
-    name = cms.string("L1Muon"),
-    doc = cms.string("L1Muon candidates from Correlator Layer 2"),
+process.scPhase2TrackerMuonStructToTable = cms.EDProducer("ScTrackerMuonToOrbitFlatTable",
+    src = cms.InputTag("scPhase2TrackerMuonRawToDigiStruct"),
+    name = cms.string("L1TrackerMuon"),
+    doc = cms.string("L1TrackerMuon candidates from Correlator Layer 2"),
 )
-process.dimuStruct = cms.EDProducer("ScPhase2MuonDiMuDemo",
-    src = cms.InputTag("scPhase2MuonRawToDigiStruct"),
+process.dimuStruct = cms.EDProducer("ScPhase2TrackerMuonDiMuDemo",
+    src = cms.InputTag("scPhase2TrackerMuonRawToDigiStruct"),
     runCandidate = cms.bool(False),
     runStruct = cms.bool(True),
     runSOA = cms.bool(False)
@@ -211,8 +211,11 @@ process.p_simple = cms.Path(
 )
 process.p_struct = cms.Path(
   process.scPhase2PuppiRawToDigiStruct
+  +process.scPhase2TrackerMuonRawToDigiStruct
   +process.w3piStruct
+  +process.dimuStruct
   +process.scPhase2PuppiStructToTable
+  +process.scPhase2TrackerMuonStructToTable
 )
 process.p_soa = cms.Path(
   process.scPhase2PuppiRawToDigiSOA
@@ -221,18 +224,25 @@ process.p_soa = cms.Path(
 process.p_all = cms.Path(
   process.scPhase2PuppiRawToDigiCandidate+
   process.scPhase2PuppiRawToDigiStruct+
+  process.scPhase2TrackerMuonRawToDigiStruct+
   process.scPhase2PuppiRawToDigiSOA+
   process.scPhase2PuppiStructToTable+
+  process.scPhase2TrackerMuonStructToTable+
   process.w3piCandidate+
   process.w3piStruct+
-  process.w3piSOA
+  process.w3piSOA+
+  process.dimuStruct
 )
 process.p_fast = cms.Path(
   process.scPhase2PuppiRawToDigiStruct+
+  process.scPhase2TrackerMuonRawToDigiStruct+
   process.scPhase2PuppiRawToDigiSOA+
   process.scPhase2PuppiStructToTable+
+  process.scPhase2TrackerMuonStructToTable+
   process.w3piStruct+
-  process.w3piSOA
+  process.w3piSOA+
+  process.dimuStruct
+
 )
 process.scPhase2PuppiStructNanoAll = cms.OutputModule("OrbitNanoAODOutputModule",
     fileName = cms.untracked.string(options.outFile),
@@ -251,36 +261,31 @@ process.scPhase2PuppiStructNanoW3pi = cms.OutputModule("OrbitNanoAODOutputModule
     compressionAlgorithm = cms.untracked.string("LZ4"),
 )
 
-process.scPhase2MuonStructNanoAll = cms.OutputModule("OrbitNanoAODOutputModule",
+process.scPhase2TrackerMuonStructNanoAll = cms.OutputModule("OrbitNanoAODOutputModule",
     fileName = cms.untracked.string(options.outFile.replace(".root","")+".tkMu.root"),
-    outputCommands = cms.untracked.vstring("drop *", "keep l1ScoutingRun3OrbitFlatTable_scPhase2MuonStructToTable_*_*"),
+    outputCommands = cms.untracked.vstring("drop *", "keep l1ScoutingRun3OrbitFlatTable_scPhase2TrackerMuonStructToTable_*_*"),
     compressionLevel = cms.untracked.int32(4),
     compressionAlgorithm = cms.untracked.string("LZ4"),
 )
-process.scPhase2MuonStructNanoDiMu = cms.OutputModule("OrbitNanoAODOutputModule",
+
+process.scPhase2TrackerMuonStructNanoDiMu = cms.OutputModule("OrbitNanoAODOutputModule",
     fileName = cms.untracked.string(options.outFile.replace(".root","")+".dimu.root"),
     selectedBx = cms.InputTag("dimuStruct","selectedBx"),
     outputCommands = cms.untracked.vstring("drop *", 
-        "keep l1ScoutingRun3OrbitFlatTable_scPhase2MuonStructToTable_*_*",
+        "keep l1ScoutingRun3OrbitFlatTable_scPhase2TrackerMuonStructToTable_*_*",
         "keep l1ScoutingRun3OrbitFlatTable_dimuStruct_*_*"
         ),
     compressionLevel = cms.untracked.int32(4),
     compressionAlgorithm = cms.untracked.string("LZ4"),
 )
 
-process.o_structAll = cms.EndPath( process.scPhase2PuppiStructNanoAll )
+process.o_structAll  = cms.EndPath( process.scPhase2PuppiStructNanoAll + process.scPhase2TrackerMuonStructNanoAll )
 process.o_structW3pi = cms.EndPath( process.scPhase2PuppiStructNanoW3pi )
+process.o_structDiMu = cms.EndPath( process.scPhase2TrackerMuonStructNanoDiMu )
 
-
-if options.doTkMuons:
-    print("Adding the Muon stuff")
-    process.p_all+=process.scPhase2MuonRawToDigiStruct
-    process.p_all+=process.scPhase2MuonStructToTable
-    process.p_all+=process.dimuStruct
-    process.o_structAll+=process.scPhase2MuonStructNanoAll
-    process.o_structW3pi+=process.scPhase2MuonStructNanoDiMu
-
-sched = [ getattr(process, "p_"+options.puppiMode) ]
+sched = [ getattr(process, "p_"+options.mode) ]
 if options.outMode != "none":
-  sched.append(getattr(process, "o_"+options.outMode))
+    for mode in options.outMode.split(","):
+        sched.append(getattr(process, "o_"+mode))
+
 process.schedule = cms.Schedule(*sched)

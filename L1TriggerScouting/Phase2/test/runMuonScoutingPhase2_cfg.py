@@ -121,7 +121,7 @@ process.source = cms.Source("DAQSource",
     maxBufferedFiles = cms.untracked.uint32(4),
     fileListMode = cms.untracked.bool(True),
     fileNames = cms.untracked.vstring(
-        buDir + "/" + "run%06d_ls%04d_index%06d_ts00.raw" % (options.runNumber, options.lumiNumber, 1)
+        buDir + "/" + "run%06d_ls%04d_index%06d_stream00.raw" % (options.runNumber, options.lumiNumber, 1)
     )
 )
 os.system("touch " + buDir + "/" + "fu.lock")

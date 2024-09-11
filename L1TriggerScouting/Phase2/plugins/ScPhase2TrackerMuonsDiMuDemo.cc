@@ -9,7 +9,7 @@
 #include "DataFormats/L1Scouting/interface/OrbitCollection.h"
 #include "DataFormats/L1Scouting/interface/OrbitFlatTable.h"
 #include "DataFormats/L1TParticleFlow/interface/PFCandidate.h"
-#include "DataFormats/L1TMuonPhase2/interface/L1ScoutingMuon.h"
+#include "DataFormats/L1TMuonPhase2/interface/L1ScoutingTrackerMuon.h"
 #include "L1TriggerScouting/Utilities/interface/BxOffsetsFiller.h"
 
 #include <ROOT/RVec.hxx>
@@ -20,10 +20,10 @@
 #include <array>
 #include <iostream>
 
-class ScPhase2MuonDiMuDemo : public edm::stream::EDProducer<> {
+class ScPhase2TrackerMuonDiMuDemo : public edm::stream::EDProducer<> {
 public:
-  explicit ScPhase2MuonDiMuDemo(const edm::ParameterSet &);
-  ~ScPhase2MuonDiMuDemo() override;
+  explicit ScPhase2TrackerMuonDiMuDemo(const edm::ParameterSet &);
+  ~ScPhase2TrackerMuonDiMuDemo() override;
   static void fillDescriptions(edm::ConfigurationDescriptions &descriptions);
 
 private:
@@ -36,11 +36,11 @@ private:
               unsigned long &nTry,
               unsigned long &nPass,
               const std::string &bxLabel);
-  //void runSOA(const l1Scouting::MuonSOA &src, edm::Event &out);
+  //void runSOA(const l1Scouting::TrackerMuonSOA &src, edm::Event &out);
 
   bool doCandidate_, doStruct_, doSOA_;
-  edm::EDGetTokenT<OrbitCollection<l1Scouting::Muon>> structToken_;
-  //edm::EDGetTokenT<l1Scouting::MuonSOA> soaToken_;
+  edm::EDGetTokenT<OrbitCollection<l1Scouting::TrackerMuon>> structToken_;
+  //edm::EDGetTokenT<l1Scouting::TrackerMuonSOA> soaToken_;
 
   struct Cuts {
     float minptOverMass = 0.25;  
@@ -56,53 +56,53 @@ private:
   unsigned long passStruct_, passSOA_;
 };
 
-ScPhase2MuonDiMuDemo::ScPhase2MuonDiMuDemo(const edm::ParameterSet &iConfig)
+ScPhase2TrackerMuonDiMuDemo::ScPhase2TrackerMuonDiMuDemo(const edm::ParameterSet &iConfig)
     : doStruct_(iConfig.getParameter<bool>("runStruct")),
       doSOA_(iConfig.getParameter<bool>("runSOA")) {
 
   if (doStruct_) {
-    structToken_ = consumes<OrbitCollection<l1Scouting::Muon>>(iConfig.getParameter<edm::InputTag>("src"));
+    structToken_ = consumes<OrbitCollection<l1Scouting::TrackerMuon>>(iConfig.getParameter<edm::InputTag>("src"));
     produces<std::vector<unsigned>>("selectedBx");
     produces<l1ScoutingRun3::OrbitFlatTable>("DiMu");
   }
 //  if (doSOA_) {
-//    soaToken_ = consumes<l1Scouting::MuonSOA>(iConfig.getParameter<edm::InputTag>("src"));
-//    produces<l1Scouting::MuonSOA>();
+//    soaToken_ = consumes<l1Scouting::TrackerMuonSOA>(iConfig.getParameter<edm::InputTag>("src"));
+//    produces<l1Scouting::TrackerMuonSOA>();
 //  }
 }
 
-ScPhase2MuonDiMuDemo::~ScPhase2MuonDiMuDemo(){};
+ScPhase2TrackerMuonDiMuDemo::~ScPhase2TrackerMuonDiMuDemo(){};
 
-void ScPhase2MuonDiMuDemo::beginStream(edm::StreamID) {
+void ScPhase2TrackerMuonDiMuDemo::beginStream(edm::StreamID) {
   countStruct_ = 0;
   countSOA_ = 0;
   passStruct_ = 0;
   passSOA_ = 0;
 }
 
-void ScPhase2MuonDiMuDemo::produce(edm::Event &iEvent, const edm::EventSetup &iSetup) {
+void ScPhase2TrackerMuonDiMuDemo::produce(edm::Event &iEvent, const edm::EventSetup &iSetup) {
 
   if (doStruct_) {
-    edm::Handle<OrbitCollection<l1Scouting::Muon>> src;
+    edm::Handle<OrbitCollection<l1Scouting::TrackerMuon>> src;
     iEvent.getByToken(structToken_, src);
     runObj(*src, iEvent, countStruct_, passStruct_, "");
   }
 //  if (doSOA_) {
-//    edm::Handle<l1Scouting::MuonSOA> src;
+//    edm::Handle<l1Scouting::TrackerMuonSOA> src;
 //    iEvent.getByToken(soaToken_, src);
 //    runSOA(*src, iEvent);
 //  }
 }
 
-void ScPhase2MuonDiMuDemo::endStream() {
+void ScPhase2TrackerMuonDiMuDemo::endStream() {
   if (doStruct_)
-    std::cout << "DiMuon | Struct analysis : " << countStruct_ << " -> " << passStruct_ << std::endl;
+    std::cout << "DiTrackerMuon | Struct analysis : " << countStruct_ << " -> " << passStruct_ << std::endl;
   if (doSOA_)
-    std::cout << "DiMuon | SOA analysis    : " << countSOA_    << " -> " << passSOA_    << std::endl;
+    std::cout << "DiTrackerMuon | SOA analysis    : " << countSOA_    << " -> " << passSOA_    << std::endl;
 }
 
 template <typename T>
-void ScPhase2MuonDiMuDemo::runObj(const OrbitCollection<T> &src,
+void ScPhase2TrackerMuonDiMuDemo::runObj(const OrbitCollection<T> &src,
                                    edm::Event &iEvent,
                                    unsigned long &nTry,
                                    unsigned long &nPass,
@@ -160,13 +160,13 @@ void ScPhase2MuonDiMuDemo::runObj(const OrbitCollection<T> &src,
   iEvent.put(std::move(tab), "DiMu" + label);
 }
 /*
-void ScPhase2MuonDiMuDemo::runSOA(const l1Scouting::MuonSOA &src, edm::Event &iEvent) {}
+void ScPhase2TrackerMuonDiMuDemo::runSOA(const l1Scouting::TrackerMuonSOA &src, edm::Event &iEvent) {}
 */
 
-void ScPhase2MuonDiMuDemo::fillDescriptions(edm::ConfigurationDescriptions &descriptions) {
+void ScPhase2TrackerMuonDiMuDemo::fillDescriptions(edm::ConfigurationDescriptions &descriptions) {
   edm::ParameterSetDescription desc;
   desc.setUnknown();
   descriptions.addDefault(desc);
 }
 
-DEFINE_FWK_MODULE(ScPhase2MuonDiMuDemo);
+DEFINE_FWK_MODULE(ScPhase2TrackerMuonDiMuDemo);
